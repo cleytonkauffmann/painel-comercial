@@ -25,14 +25,12 @@ NAVY_ACCENT = "#38BDF8"
 
 st.markdown(f"""
 <style>
-/* Importação e definição da fonte Amasis MT Pro / Serif Elegante */
-@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&display=swap');
-
+/* Definição visual para títulos estilizados */
 .stApp {{ background-color: {BG_DARK}; color: {TEXT_MAIN}; }}
 .block-container {{ padding-top: 1.5rem; max-width: 1350px; }}
 h1, h2, h3, h4, h5 {{ color: {TEXT_MAIN} !important; font-family: 'Amasis MT Pro', 'Georgia', serif; }}
 
-/* Fonte Personalizada Executiva */
+/* Fonte Personalizada Executiva Imponente */
 .executive-font {{
     font-family: 'Amasis MT Pro Black', 'Amasis MT Pro', 'Georgia', serif !important;
     font-weight: 900 !important;
@@ -76,21 +74,21 @@ h1, h2, h3, h4, h5 {{ color: {TEXT_MAIN} !important; font-family: 'Amasis MT Pro
 
 /* Foto de Perfil Arredondada */
 .profile-img {{
-    width: 170px;
-    height: 170px;
+    width: 180px;
+    height: 180px;
     border-radius: 50%;
     object-fit: cover;
     border: 4px solid {GREEN_NEON};
     box-shadow: 0px 8px 20px rgba(0,0,0,0.4);
 }}
 
-/* Cards da Identificação */
+/* Card da Identificação Clean */
 .id-card {{
     background-color: {CARD_DARK};
     border: 1px solid {BORDER_DARK};
-    padding: 20px 25px;
-    border-radius: 12px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    padding: 30px 35px;
+    border-radius: 14px;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.3);
 }}
 
 .stTextInput label, .stSelectbox label, .stNumberInput label, .stDateInput label {{
@@ -140,61 +138,64 @@ if "upcoming" not in st.session_state:
 if "faturado_auto" not in st.session_state:
     st.session_state.faturado_auto = 382000.00
 
-# ===== BARRA LATERAL (SIDEBAR): ARQUIVOS E IMPORTS =====
+# ===== BARRA LATERAL (SIDEBAR): TODOS OS FORMULÁRIOS E UPLOADS =====
 with st.sidebar:
-    st.header("⚙️ Configurações & Arquivos")
+    st.header("⚙️ Painel de Controle")
     
-    st.subheader("1. Foto do Executivo")
-    foto_upload = st.file_uploader("Enviar Foto de Perfil", type=["png", "jpg", "jpeg"])
+    with st.expander("👤 Dados da Identificação", expanded=True):
+        nome_input = st.text_input("Nome do Executivo / KAM", value="Cleyton Kauffmann")
+        mes_input = st.selectbox("Mês de Referência", months, index=7)
+        data_ref = st.date_input("Data de Apresentação")
+        foto_upload = st.file_uploader("Foto de Perfil", type=["png", "jpg", "jpeg"])
 
-    st.subheader("2. Dados do Relatório (.xlsx)")
-    uploaded_file = st.file_uploader("Enviar Planilha Excel", type=["xlsx"])
+    with st.expander("📂 Importar Planilha Excel", expanded=False):
+        uploaded_file = st.file_uploader("Arquivo .xlsx", type=["xlsx"])
 
-    if uploaded_file:
-        try:
-            excel_data = pd.read_excel(uploaded_file, sheet_name=None)
-            sheet_target = "Export" if "Export" in excel_data else list(excel_data.keys())[0]
-            df_export = excel_data[sheet_target]
-            
-            if "Razão Grupo" in df_export.columns and "Mês atual" in df_export.columns:
-                df_valid = df_export[
-                    df_export["Razão Grupo"].notna() & 
-                    (~df_export["Razão Grupo"].astype(str).str.startswith("Total")) &
-                    (~df_export["Razão Grupo"].astype(str).str.startswith("Filtros"))
-                ].copy()
-
-                df_valid["Mês atual"] = pd.to_numeric(df_valid["Mês atual"], errors='coerce').fillna(0.0)
-                df_valid["Mês anterior"] = pd.to_numeric(df_valid["Mês anterior"], errors='coerce').fillna(0.0)
-
-                total_faturado_calc = float(df_valid["Mês atual"].sum())
+        if uploaded_file:
+            try:
+                excel_data = pd.read_excel(uploaded_file, sheet_name=None)
+                sheet_target = "Export" if "Export" in excel_data else list(excel_data.keys())[0]
+                df_export = excel_data[sheet_target]
                 
-                if st.session_state.faturado_auto != total_faturado_calc:
-                    st.session_state.faturado_auto = total_faturado_calc
+                if "Razão Grupo" in df_export.columns and "Mês atual" in df_export.columns:
+                    df_valid = df_export[
+                        df_export["Razão Grupo"].notna() & 
+                        (~df_export["Razão Grupo"].astype(str).str.startswith("Total")) &
+                        (~df_export["Razão Grupo"].astype(str).str.startswith("Filtros"))
+                    ].copy()
 
-                    top5 = df_valid.sort_values(by="Mês atual", ascending=False).head(5)
-                    novos_clientes = []
-                    for idx, row in top5.iterrows():
-                        novos_clientes.append({
-                            "CLIENTE": str(row["Razão Grupo"]),
-                            "RECEITA": float(row["Mês atual"]),
-                            "MÊS ANTERIOR": float(row["Mês anterior"]),
-                            "ANO ANTERIOR": 0.0,
-                            "RENTABILIDADE": 0.0,
-                            "SLA": 0.0,
-                            "CONSIDERAÇÕES": ""
-                        })
+                    df_valid["Mês atual"] = pd.to_numeric(df_valid["Mês atual"], errors='coerce').fillna(0.0)
+                    df_valid["Mês anterior"] = pd.to_numeric(df_valid["Mês anterior"], errors='coerce').fillna(0.0)
 
-                    while len(novos_clientes) < 5:
-                        novos_clientes.append({
-                            "CLIENTE": "", "RECEITA": 0.0, "MÊS ANTERIOR": 0.0,
-                            "ANO ANTERIOR": 0.0, "RENTABILIDADE": 0.0, "SLA": 0.0, "CONSIDERAÇÕES": ""
-                        })
+                    total_faturado_calc = float(df_valid["Mês atual"].sum())
+                    
+                    if st.session_state.faturado_auto != total_faturado_calc:
+                        st.session_state.faturado_auto = total_faturado_calc
 
-                    st.session_state.clientes = pd.DataFrame(novos_clientes)
-                    st.success(f"✅ Excel importado!")
-                    st.rerun()
-        except Exception as e:
-            st.error(f"Erro ao ler arquivo: {e}")
+                        top5 = df_valid.sort_values(by="Mês atual", ascending=False).head(5)
+                        novos_clientes = []
+                        for idx, row in top5.iterrows():
+                            novos_clientes.append({
+                                "CLIENTE": str(row["Razão Grupo"]),
+                                "RECEITA": float(row["Mês atual"]),
+                                "MÊS ANTERIOR": float(row["Mês anterior"]),
+                                "ANO ANTERIOR": 0.0,
+                                "RENTABILIDADE": 0.0,
+                                "SLA": 0.0,
+                                "CONSIDERAÇÕES": ""
+                            })
+
+                        while len(novos_clientes) < 5:
+                            novos_clientes.append({
+                                "CLIENTE": "", "RECEITA": 0.0, "MÊS ANTERIOR": 0.0,
+                                "ANO ANTERIOR": 0.0, "RENTABILIDADE": 0.0, "SLA": 0.0, "CONSIDERAÇÕES": ""
+                            })
+
+                        st.session_state.clientes = pd.DataFrame(novos_clientes)
+                        st.success(f"✅ Dados atualizados!")
+                        st.rerun()
+            except Exception as e:
+                st.error(f"Erro ao ler arquivo: {e}")
 
 # ===== HEADER PRINCIPAL =====
 st.markdown(f"""
@@ -223,7 +224,7 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
 ])
 
 # ----------------------------------------------------
-# SLIDE 1: IDENTIFICAÇÃO (DESIGN EXECUTIVO SLIM)
+# SLIDE 1: IDENTIFICAÇÃO (APENAS O CARD VISUAL EXECUTIVO)
 # ----------------------------------------------------
 with tab1:
     st.subheader("1. Identificação do Executivo")
@@ -233,43 +234,34 @@ with tab1:
     
     with col_foto:
         if foto_upload is not None:
-            st.image(foto_upload, width=170)
+            st.image(foto_upload, width=180)
         else:
             st.markdown(f"""
             <div style="
-                width: 170px; height: 170px; border-radius: 50%; 
-                background-color: {CARD_DARK}; border: 3px solid {BORDER_DARK}; 
+                width: 180px; height: 180px; border-radius: 50%; 
+                background-color: {CARD_DARK}; border: 3px dashed {BORDER_DARK}; 
                 display: flex; align-items: center; justify-content: center; 
-                color: {TEXT_MUTED}; font-size: 0.9rem; text-align: center;">
-                👤 Foto na Lateral
+                color: {TEXT_MUTED}; font-size: 0.85rem; text-align: center;">
+                📸 Envie a foto na barra lateral
             </div>
             """, unsafe_allow_html=True)
 
     with col_info:
-        # Formulário limpo
-        c_nome, c_mes = st.columns([2, 1])
-        with c_nome:
-            nome_input = st.text_input("NOME DO EXECUTIVO / KAM", value="Cleyton Kauffmann")
-        with c_mes:
-            mes_input = st.selectbox("MÊS DE REFERÊNCIA", months, index=7)
-            
-        data_ref = st.date_input("DATA DE APRESENTAÇÃO")
-
-        st.divider()
-
-        # Destaque com Fonte Amasis MT Pro Black
+        # Card Visual com Fonte Amasis MT Pro Black
         st.markdown(f"""
         <div class="id-card">
-            <span style="color: {TEXT_MUTED}; font-size: 0.85rem; font-weight: 700; text-transform: uppercase;">Apresentado por</span>
-            <div class="executive-font" style="font-size: 2.3rem; color: #FFFFFF; margin-top: 4px;">
-                {nome_input.upper()}
+            <span style="color: {TEXT_MUTED}; font-size: 0.9rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
+                Executivo de Contas / KAM
+            </span>
+            <div class="executive-font" style="font-size: 2.6rem; color: #FFFFFF; margin: 6px 0 12px 0; text-transform: uppercase;">
+                {nome_input}
             </div>
-            <div style="display: flex; gap: 15px; margin-top: 10px; align-items: center;">
-                <span class="executive-font" style="background-color: {GREEN_NEON}; color: #000; padding: 4px 12px; border-radius: 6px; font-size: 1.1rem;">
+            <div style="display: flex; gap: 15px; align-items: center;">
+                <span class="executive-font" style="background-color: {GREEN_NEON}; color: #000; padding: 6px 16px; border-radius: 8px; font-size: 1.1rem;">
                     MÊS: {mes_input.upper()}
                 </span>
-                <span style="color: {NAVY_ACCENT}; font-weight: 600; font-size: 1.0rem;">
-                    📅 {data_ref.strftime('%d/%m/%Y')}
+                <span style="color: {NAVY_ACCENT}; font-weight: 600; font-size: 1.05rem;">
+                    📅 Apresentação: {data_ref.strftime('%d/%m/%Y')}
                 </span>
             </div>
         </div>
