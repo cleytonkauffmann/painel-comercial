@@ -5,6 +5,7 @@ from io import BytesIO
 from pptx import Presentation
 from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
+import plotly.graph_objects as go
 
 # ===== Função de Formatação Brasileira (ex: 350.658,00) =====
 def fmt_br(valor):
@@ -283,7 +284,54 @@ st.session_state.df_historico = st.data_editor(
 )
 
 st.markdown("#### Evolução Mensal (Meta vs Faturado)")
-st.line_chart(st.session_state.df_historico.set_index("Mês")[["Meta Total", "Fat. Total"]], color=[BLUE, GREEN])
+
+# ===== GRÁFICO PERSONALIZADO (BARRAS VERDE ESCURO + LINHA TRACEJADA + ORDEM CRONOLÓGICA) =====
+fig = go.Figure()
+
+# 1. Barras em Verde Escuro para o Faturado
+fig.add_trace(go.Bar(
+    x=st.session_state.df_historico["Mês"],
+    y=st.session_state.df_historico["Fat. Total"],
+    name="Faturado Alcançado",
+    marker_color="#1E8449",
+    hovertemplate="Mês: %{x}<br>Faturado: R$ %{y:,.2f}<extra></extra>"
+))
+
+# 2. Linha Tracejada Conectando de Barra a Barra (Topo a Topo)
+fig.add_trace(go.Scatter(
+    x=st.session_state.df_historico["Mês"],
+    y=st.session_state.df_historico["Fat. Total"],
+    name="Tendência Faturado",
+    mode="lines+markers",
+    line=dict(color="#145A32", dash="dash", width=2),
+    marker=dict(size=7, color="#145A32"),
+    hovertemplate="Mês: %{x}<br>Tendência: R$ %{y:,.2f}<extra></extra>"
+))
+
+# 3. Linha Contínua para Meta Total
+fig.add_trace(go.Scatter(
+    x=st.session_state.df_historico["Mês"],
+    y=st.session_state.df_historico["Meta Total"],
+    name="Meta Total",
+    mode="lines",
+    line=dict(color="#102A43", width=3),
+    hovertemplate="Mês: %{x}<br>Meta: R$ %{y:,.2f}<extra></extra>"
+))
+
+# Configurações do layout e ordenação dos meses
+fig.update_layout(
+    xaxis=dict(
+        categoryorder="array",
+        categoryarray=months
+    ),
+    yaxis=dict(title="Valor (R$)", tickprefix="R$ "),
+    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+    margin=dict(l=20, r=20, t=40, b=20),
+    template="plotly_white",
+    hovermode="x unified"
+)
+
+st.plotly_chart(fig, use_container_width=True)
 st.markdown('</div>', unsafe_allow_html=True)
 
 # ===== SEÇÃO 4: PRINCIPAIS CLIENTES =====
@@ -333,6 +381,18 @@ st.session_state.fechados = st.data_editor(
     }
 )
 
+# Totais calculados para o Pipeline
+tot_proj_fechados = pd.to_numeric(st.session_state.fechados["PROJEÇÃO MÊS"], errors='coerce').fillna(0.0).sum()
+tot_fat_fechados = pd.to_numeric(st.session_state.fechados["FATURADO MÊS"], errors='coerce').fillna(0.0).sum()
+
+cp_tot1, cp_tot2 = st.columns(2)
+with cp_tot1:
+    st.metric("TOTAL PROJEÇÃO MÊS", f"R$ {fmt_br(tot_proj_fechados)}")
+with cp_tot2:
+    st.metric("TOTAL FATURADO MÊS", f"R$ {fmt_br(tot_fat_fechados)}")
+
+st.divider()
+
 st.subheader("UPCOMING — FECHADO PARA INICIAR")
 st.session_state.upcoming = st.data_editor(
     st.session_state.upcoming,
@@ -344,6 +404,14 @@ st.session_state.upcoming = st.data_editor(
         "PROJEÇÃO MÊS": st.column_config.NumberColumn(format="R$ %,.2f"),
     }
 )
+
+# Total calculado para o Upcoming
+tot_proj_upcoming = pd.to_numeric(st.session_state.upcoming["PROJEÇÃO MÊS"], errors='coerce').fillna(0.0).sum()
+
+cu_tot1, _ = st.columns([1, 1])
+with cu_tot1:
+    st.metric("TOTAL PROJEÇÃO MÊS (UPCOMING)", f"R$ {fmt_br(tot_proj_upcoming)}")
+
 st.markdown('</div>', unsafe_allow_html=True)
 
 # ===== SEÇÃO 6: EXPORTAÇÃO =====
