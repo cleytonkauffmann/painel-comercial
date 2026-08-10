@@ -202,7 +202,7 @@ with st.sidebar:
                             })
 
                         st.session_state.clientes = pd.DataFrame(novos_clientes)
-                        st.success(f"✅ Dados atualizados!")
+                        st.success("✅ Dados atualizados!")
                         st.rerun()
             except Exception as e:
                 st.error(f"Erro ao ler arquivo: {e}")
@@ -234,7 +234,7 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
 ])
 
 # ----------------------------------------------------
-# SLIDE 1: IDENTIFICAÇÃO (APENAS O CARD VISUAL EXECUTIVO)
+# SLIDE 1: IDENTIFICAÇÃO (CARD VISUAL CLEAN)
 # ----------------------------------------------------
 with tab1:
     st.subheader("1. Identificação do Executivo")
@@ -257,7 +257,6 @@ with tab1:
             """, unsafe_allow_html=True)
 
     with col_info:
-        # Card Visual com Fonte Amasis MT Pro Black
         st.markdown(f"""
         <div class="id-card">
             <span style="color: {TEXT_MUTED}; font-size: 0.9rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
@@ -278,7 +277,7 @@ with tab1:
         """, unsafe_allow_html=True)
 
 # ----------------------------------------------------
-# SLIDE 2: META & FATURAMENTO (VISUAL 100% CLEAN)
+# SLIDE 2: META & FATURAMENTO (CARD EXECUTIVO VISÍVEL)
 # ----------------------------------------------------
 with tab2:
     st.subheader("2. META | FATURAMENTO — MÊS ATUAL")
@@ -367,7 +366,7 @@ with tab2:
         """, unsafe_allow_html=True)
 
 # ----------------------------------------------------
-# SLIDE 3: EVOLUÇÃO HISTÓRICA
+# SLIDE 3: EVOLUÇÃO HISTÓRICA (VALORES EM "k" NO TOPO)
 # ----------------------------------------------------
 with tab3:
     st.subheader("3. META | FATURAMENTO — EVOLUÇÃO HISTÓRICA")
@@ -398,35 +397,57 @@ with tab3:
         }
     )
 
-    # Gráfico Ajustado (Com rótulos na base)
-    valores_formatados = [f"R$ {fmt_br(v)}" if v > 0 else "" for v in st.session_state.df_historico["Fat. Total"]]
+    # ===== FORMATAÇÃO ABREVIADA (ex: 369k) =====
+    valores_k = []
+    for v in st.session_state.df_historico["Fat. Total"]:
+        if v >= 1000:
+            valores_k.append(f"{int(round(v / 1000))}k")
+        elif v > 0:
+            valores_k.append(f"{v:.0f}")
+        else:
+            valores_k.append("")
+
+    # Mêses Abreviados para o Eixo X
+    meses_abrev = [m[:3] for m in st.session_state.df_historico["Mês"]]
 
     fig = go.Figure()
+    
+    # Barras com valores no TOPO
     fig.add_trace(go.Bar(
-        x=st.session_state.df_historico["Mês"],
+        x=meses_abrev,
         y=st.session_state.df_historico["Fat. Total"],
         name="Faturado Alcançado",
         marker_color=GREEN_NEON,
-        text=valores_formatados,
-        textposition="inside",
-        insidetextanchor="end",
-        width=0.4,
+        text=valores_k,
+        textposition="outside",  # Coloca o texto em cima da barra
+        textfont=dict(size=13, color="#FFFFFF", family="Arial Black"),
+        width=0.45,
         hovertemplate="<b>%{x}</b><br>Faturado: R$ %{y:,.2f}<extra></extra>"
     ))
 
+    # Linha de Tendência
     fig.add_trace(go.Scatter(
-        x=st.session_state.df_historico["Mês"],
+        x=meses_abrev,
         y=st.session_state.df_historico["Fat. Total"],
         name="Tendência",
         mode="lines+markers",
         line=dict(color=NAVY_ACCENT, dash="dash", width=3),
+        marker=dict(size=8),
         hovertemplate="<b>%{x}</b><br>Tendência: R$ %{y:,.2f}<extra></extra>"
     ))
 
+    # Teto do eixo Y para os rótulos não cortarem na borda superior
+    max_val = st.session_state.df_historico["Fat. Total"].max()
+    teto_y = (max_val * 1.18) if max_val > 0 else 100000
+
     fig.update_layout(
-        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#0F172A",
-        font=dict(color="#F8FAFC"), margin=dict(l=20, r=20, t=30, b=20),
+        paper_bgcolor="rgba(0,0,0,0)", 
+        plot_bgcolor="#0F172A",
+        font=dict(color="#F8FAFC"), 
+        margin=dict(l=20, r=20, t=40, b=20),
         hovermode="x unified",
+        yaxis=dict(range=[0, teto_y], showgrid=True, gridcolor="#334155"),
+        xaxis=dict(showgrid=False),
         legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5)
     )
 
