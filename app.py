@@ -7,17 +7,17 @@ from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
 import plotly.graph_objects as go
 
-# ===== Função de Formatação Brasileira (ex: 350.658,00) =====
+# ===== FUNÇÃO DE FORMATAÇÃO BRASILEIRA (Ex: 350.658,00) =====
 def fmt_br(valor):
     try:
         return f"{float(valor):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
     except (ValueError, TypeError):
         return "0,00"
 
-# ===== Configuração da Página =====
+# ===== CONFIGURAÇÃO DA PÁGINA =====
 st.set_page_config(page_title="Apresentação Comercial - KAO", page_icon="🚚", layout="wide")
 
-# ===== Identidade Visual =====
+# ===== IDENTIDADE VISUAL =====
 NAVY = "#102A43"
 GREEN = "#1E8449"
 GRAY = "#5D6D7E"
@@ -49,7 +49,7 @@ h1, h2, h3 {{ color: {NAVY}; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, s
 </style>
 """, unsafe_allow_html=True)
 
-# ===== Header Principal =====
+# ===== HEADER PRINCIPAL =====
 st.markdown(f"""
 <div class="header-slide">
     <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -64,7 +64,7 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# ===== Estado da Sessão (Session State) =====
+# ===== ESTADO DA SESSÃO (SESSION STATE) =====
 months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", 
           "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
 
@@ -193,7 +193,7 @@ delta_pct = pct_realizado - 100
 
 st.divider()
 
-# ===== INDICADORES EM DESTAQUE (BOLA VERDE/DINÂMICA) =====
+# ===== INDICADORES EM DESTAQUE =====
 m1, m2, m3 = st.columns(3)
 
 cor_bola = "#1E8449" if pct_realizado >= 100 else "#C0392B"
@@ -282,30 +282,39 @@ st.markdown("##### ⚡ Ações Rápidas de Preenchimento")
 
 c_auto1, c_auto2, c_auto3 = st.columns([2, 2, 2])
 
+# ----- COLUNA 1: LANÇAR META MÊS A MÊS -----
 with c_auto1:
-    valor_meta_replicar = st.number_input(
-        "Replicar Meta Mensal (R$)", 
-        value=float(meta), 
-        step=1000.0,
-        key="input_meta_rep"
-    )
-    if st.button("🔄 Aplicar Meta para Todos os Meses", use_container_width=True):
-        st.session_state.df_historico["Meta Total"] = valor_meta_replicar
-        st.success("Meta replicada para todos os meses!")
-        st.rerun()
+    mes_meta_lanc = st.selectbox("Lançar Meta no Mês", months, index=months.index(mes), key="sel_mes_meta")
+    valor_meta_lanc = st.number_input("Valor da Meta (R$)", min_value=0.0, value=float(meta), step=1000.0, key="input_meta_lanc")
+    
+    col_btn_meta1, col_btn_meta2 = st.columns(2)
+    with col_btn_meta1:
+        if st.button("💾 Salvar Meta do Mês", use_container_width=True):
+            idx = st.session_state.df_historico[st.session_state.df_historico["Mês"] == mes_meta_lanc].index
+            if len(idx) > 0:
+                st.session_state.df_historico.loc[idx[0], "Meta Total"] = valor_meta_lanc
+                st.success(f"Meta de {mes_meta_lanc} atualizada!")
+                st.rerun()
+    with col_btn_meta2:
+        if st.button("🔄 Replicar p/ Todos", use_container_width=True, help="Aplica este valor de Meta para todos os 12 meses"):
+            st.session_state.df_historico["Meta Total"] = valor_meta_lanc
+            st.success("Meta replicada para todos os meses!")
+            st.rerun()
 
+# ----- COLUNA 2: LANÇAR FATURADO MÊS A MÊS -----
 with c_auto2:
     mes_lancamento = st.selectbox("Lançar Faturado no Mês", months, index=months.index(mes), key="sel_mes_lanc")
     valor_fat_lanc = st.number_input("Valor Faturado (R$)", min_value=0.0, value=float(faturado), step=1000.0, key="input_fat_lanc")
-    if st.button("💾 Salvar Faturamento do Mês", use_container_width=True):
+    if st.button("💾 Salvar Faturado do Mês", use_container_width=True):
         idx = st.session_state.df_historico[st.session_state.df_historico["Mês"] == mes_lancamento].index
         if len(idx) > 0:
             st.session_state.df_historico.loc[idx[0], "Fat. Total"] = valor_fat_lanc
             st.success(f"Faturado de {mes_lancamento} atualizado para R$ {fmt_br(valor_fat_lanc)}!")
             st.rerun()
 
+# ----- COLUNA 3: AÇÕES GLOBAIS -----
 with c_auto3:
-    st.write("")
+    st.write("##### 🧹 Limpeza")
     st.write("")
     if st.button("🧹 Zerar Faturamentos do Ano", use_container_width=True):
         st.session_state.df_historico["Fat. Total"] = 0.0
@@ -313,7 +322,7 @@ with c_auto3:
 
 st.divider()
 
-# Cálculo de UP, LOSS e %
+# Cálculo automático de UP, LOSS e %
 df_calc = st.session_state.df_historico.copy()
 df_calc["% Total"] = np.where(df_calc["Meta Total"] > 0, (df_calc["Fat. Total"] / df_calc["Meta Total"]) * 100, 0.0)
 df_calc["UP"] = np.maximum(df_calc["Fat. Total"] - df_calc["Meta Total"], 0)
@@ -334,25 +343,23 @@ st.session_state.df_historico = st.data_editor(
         "UP": st.column_config.NumberColumn("UP (R$)", format="R$ %,.2f", disabled=True),
         "LOSS": st.column_config.NumberColumn("LOSS (R$)", format="R$ %,.2f", disabled=True),
     },
-    key="editor_historico_v7"
+    key="editor_historico_v9"
 )
 
 st.markdown("#### Evolução Mensal (Faturado Alcançado)")
 
-# ===== GRÁFICO (SOMENTE BARRA FINA VERDE + LINHA TRACEJADA) =====
+# ===== GRÁFICO (BARRA FINA VERDE + LINHA TRACEJADA) =====
 fig = go.Figure()
 
-# 1. Barra do FATURADO ALCANÇADO (Fina e Verde)
 fig.add_trace(go.Bar(
     x=st.session_state.df_historico["Mês"],
     y=st.session_state.df_historico["Fat. Total"],
     name="Faturado Alcançado",
     marker_color=GREEN,
-    width=0.35,  # Barra Fina
+    width=0.35,
     hovertemplate="Mês: %{x}<br>Alcançado: R$ %{y:,.2f}<extra></extra>"
 ))
 
-# 2. Linha Tracejada Conectando as Barras de Faturado
 fig.add_trace(go.Scatter(
     x=st.session_state.df_historico["Mês"],
     y=st.session_state.df_historico["Fat. Total"],
@@ -364,10 +371,7 @@ fig.add_trace(go.Scatter(
 ))
 
 fig.update_layout(
-    xaxis=dict(
-        categoryorder="array",
-        categoryarray=months
-    ),
+    xaxis=dict(categoryorder="array", categoryarray=months),
     yaxis=dict(title="Valor (R$)", tickprefix="R$ "),
     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
     margin=dict(l=20, r=20, t=40, b=20),
