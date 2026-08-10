@@ -275,24 +275,25 @@ st.session_state.df_historico = st.data_editor(
         "UP": st.column_config.NumberColumn("UP (R$)", format="R$ %,.2f", disabled=True),
         "LOSS": st.column_config.NumberColumn("LOSS (R$)", format="R$ %,.2f", disabled=True),
     },
-    key="editor_historico_v5"
+    key="editor_historico_v6"
 )
 
 st.markdown("#### Evolução Mensal (Faturado Alcançado)")
 
-# ===== GRÁFICO (SOMENTE BARRA DO FATURADO + LINHA TRACEJADA) =====
+# ===== GRÁFICO (BARRA MAIS FINA + LINHA TRACEJADA) =====
 fig = go.Figure()
 
-# 1. Barra do FATURADO ALCANÇADO (Verde)
+# 1. Barra do FATURADO ALCANÇADO (Verde e com largura reduzida)
 fig.add_trace(go.Bar(
     x=st.session_state.df_historico["Mês"],
     y=st.session_state.df_historico["Fat. Total"],
     name="Faturado Alcançado",
     marker_color=GREEN,
+    width=0.35,  # <-- LARGURA REDUZIDA (deixa a barra bem mais fina)
     hovertemplate="Mês: %{x}<br>Alcançado: R$ %{y:,.2f}<extra></extra>"
 ))
 
-# 2. Linha Tracejada Conectando as Barras de Faturado (Tendência)
+# 2. Linha Tracejada Conectando as Barras de Faturado
 fig.add_trace(go.Scatter(
     x=st.session_state.df_historico["Mês"],
     y=st.session_state.df_historico["Fat. Total"],
