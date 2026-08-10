@@ -4,12 +4,30 @@ import numpy as np
 from io import BytesIO
 import plotly.graph_objects as go
 
-# ===== FUNÇÃO DE FORMATAÇÃO BRASILEIRA =====
+# ===== FUNÇÕES DE CONVERSÃO E FORMATAÇÃO BRASILEIRA =====
 def fmt_br(valor):
     try:
         return f"{float(valor):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
     except (ValueError, TypeError):
         return "0,00"
+
+def parse_br_to_float(texto_valor):
+    if isinstance(texto_valor, (int, float)):
+        return float(texto_valor)
+    val_str = str(texto_valor).strip()
+    if not val_str:
+        return 0.0
+    if "," in val_str:
+        val_str = val_str.replace(".", "").replace(",", ".")
+    else:
+        if val_str.count(".") == 1:
+            partes = val_str.split(".")
+            if len(partes[1]) > 2:
+                val_str = val_str.replace(".", "")
+    try:
+        return float(val_str)
+    except ValueError:
+        return 0.0
 
 # ===== CONFIGURAÇÃO DA PÁGINA =====
 st.set_page_config(page_title="Apresentação Comercial - KAO", page_icon="🚚", layout="wide")
@@ -25,19 +43,16 @@ NAVY_ACCENT = "#38BDF8"
 
 st.markdown(f"""
 <style>
-/* Estilização Geral */
 .stApp {{ background-color: {BG_DARK}; color: {TEXT_MAIN}; }}
 .block-container {{ padding-top: 1.5rem; max-width: 1350px; }}
 h1, h2, h3, h4, h5 {{ color: {TEXT_MAIN} !important; font-family: 'Amasis MT Pro', 'Georgia', serif; }}
 
-/* Fonte Personalizada Executiva Imponente */
 .executive-font {{
     font-family: 'Amasis MT Pro Black', 'Amasis MT Pro', 'Georgia', serif !important;
     font-weight: 900 !important;
     letter-spacing: 0.5px;
 }}
 
-/* Header Principal */
 .header-slide {{
     background: linear-gradient(135deg, #0284C7 0%, #0F172A 100%);
     border-left: 8px solid {GREEN_NEON};
@@ -48,7 +63,6 @@ h1, h2, h3, h4, h5 {{ color: {TEXT_MAIN} !important; font-family: 'Amasis MT Pro
     box-shadow: 0 10px 25px rgba(0,0,0,0.5);
 }}
 
-/* Estilo das Abas de Navegação (PowerPoint Style) */
 .stTabs [data-baseweb="tab-list"] {{
     gap: 8px;
     background-color: {CARD_DARK};
@@ -72,7 +86,6 @@ h1, h2, h3, h4, h5 {{ color: {TEXT_MAIN} !important; font-family: 'Amasis MT Pro
     font-weight: 800;
 }}
 
-/* Card de Destaque Financeiro */
 .kpi-card {{
     background-color: {CARD_DARK};
     border: 1px solid {BORDER_DARK};
@@ -87,7 +100,6 @@ h1, h2, h3, h4, h5 {{ color: {TEXT_MAIN} !important; font-family: 'Amasis MT Pro
     border-color: {GREEN_NEON};
 }}
 
-/* Card da Identificação Clean */
 .id-card {{
     background-color: {CARD_DARK};
     border: 1px solid {BORDER_DARK};
@@ -143,7 +155,7 @@ if "upcoming" not in st.session_state:
 if "faturado_auto" not in st.session_state:
     st.session_state.faturado_auto = 369434.39
 
-# ===== BARRA LATERAL (SIDEBAR): TODOS OS CONTROLES =====
+# ===== BARRA LATERAL (SIDEBAR): CONTROLES E IMPORTAÇÃO =====
 with st.sidebar:
     st.header("⚙️ Painel de Controle")
     
@@ -153,13 +165,9 @@ with st.sidebar:
         data_ref = st.date_input("Data de Apresentação")
         foto_upload = st.file_uploader("Foto de Perfil", type=["png", "jpg", "jpeg"])
 
-    with st.expander("🎯 Valores de Meta & Faturamento", expanded=True):
-        meta = st.number_input("📌 META DA GERÊNCIA (R$)", min_value=0.0, value=500000.00, step=1000.0)
-        faturado = st.number_input("💰 FATURADO ALCANÇADO (R$)", min_value=0.0, value=float(st.session_state.faturado_auto), step=1000.0)
-        projecao = st.number_input("📈 PROJEÇÃO MÊS (R$)", min_value=0.0, value=faturado, step=1000.0)
-
-    with st.expander("📂 Importar Planilha Excel", expanded=False):
-        uploaded_file = st.file_uploader("Arquivo .xlsx", type=["xlsx"])
+    with st.expander("📂 Importar Planilha de Dados (Automático)", expanded=True):
+        st.caption("💡 Cada usuário pode carregar sua própria planilha Excel aqui para preencher o painel instantaneamente.")
+        uploaded_file = st.file_uploader("Arraste sua planilha .xlsx aqui", type=["xlsx"])
 
         if uploaded_file:
             try:
@@ -178,34 +186,41 @@ with st.sidebar:
                     df_valid["Mês anterior"] = pd.to_numeric(df_valid["Mês anterior"], errors='coerce').fillna(0.0)
 
                     total_faturado_calc = float(df_valid["Mês atual"].sum())
-                    
-                    if st.session_state.faturado_auto != total_faturado_calc:
-                        st.session_state.faturado_auto = total_faturado_calc
+                    st.session_state.faturado_auto = total_faturado_calc
 
-                        top5 = df_valid.sort_values(by="Mês atual", ascending=False).head(5)
-                        novos_clientes = []
-                        for idx, row in top5.iterrows():
-                            novos_clientes.append({
-                                "CLIENTE": str(row["Razão Grupo"]),
-                                "RECEITA": float(row["Mês atual"]),
-                                "MÊS ANTERIOR": float(row["Mês anterior"]),
-                                "ANO ANTERIOR": 0.0,
-                                "RENTABILIDADE": 0.0,
-                                "SLA": 0.0,
-                                "CONSIDERAÇÕES": ""
-                            })
+                    top5 = df_valid.sort_values(by="Mês atual", ascending=False).head(5)
+                    novos_clientes = []
+                    for idx, row in top5.iterrows():
+                        novos_clientes.append({
+                            "CLIENTE": str(row["Razão Grupo"]),
+                            "RECEITA": float(row["Mês atual"]),
+                            "MÊS ANTERIOR": float(row["Mês anterior"]),
+                            "ANO ANTERIOR": 0.0,
+                            "RENTABILIDADE": 0.0,
+                            "SLA": 0.0,
+                            "CONSIDERAÇÕES": ""
+                        })
 
-                        while len(novos_clientes) < 5:
-                            novos_clientes.append({
-                                "CLIENTE": "", "RECEITA": 0.0, "MÊS ANTERIOR": 0.0,
-                                "ANO ANTERIOR": 0.0, "RENTABILIDADE": 0.0, "SLA": 0.0, "CONSIDERAÇÕES": ""
-                            })
+                    while len(novos_clientes) < 5:
+                        novos_clientes.append({
+                            "CLIENTE": "", "RECEITA": 0.0, "MÊS ANTERIOR": 0.0,
+                            "ANO ANTERIOR": 0.0, "RENTABILIDADE": 0.0, "SLA": 0.0, "CONSIDERAÇÕES": ""
+                        })
 
-                        st.session_state.clientes = pd.DataFrame(novos_clientes)
-                        st.success("✅ Dados atualizados!")
-                        st.rerun()
+                    st.session_state.clientes = pd.DataFrame(novos_clientes)
+                    st.success("✅ Dados importados com sucesso!")
             except Exception as e:
                 st.error(f"Erro ao ler arquivo: {e}")
+
+    with st.expander("🎯 Valores de Meta & Faturamento", expanded=False):
+        st.caption("💡 Digite com vírgula (ex: 369434,39)")
+        meta_str = st.text_input("📌 META DA GERÊNCIA (R$)", value="500.000,00")
+        faturado_str = st.text_input("💰 FATURADO ALCANÇADO (R$)", value=fmt_br(st.session_state.faturado_auto))
+        projecao_str = st.text_input("📈 PROJEÇÃO MÊS (R$)", value=faturado_str)
+
+        meta = parse_br_to_float(meta_str)
+        faturado = parse_br_to_float(faturado_str)
+        projecao = parse_br_to_float(projecao_str)
 
 # ===== HEADER PRINCIPAL =====
 st.markdown(f"""
@@ -222,7 +237,7 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# ===== CRIAÇÃO DAS ABAS (SLIDES) =====
+# ===== ABAS DE NAVEGAÇÃO =====
 tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
     "1. Identificação",
     "2. Meta & Faturamento",
@@ -233,29 +248,19 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
     "7. Exportação"
 ])
 
-# ----------------------------------------------------
-# SLIDE 1: IDENTIFICAÇÃO (CARD VISUAL CLEAN)
-# ----------------------------------------------------
 with tab1:
     st.subheader("1. Identificação do Executivo")
     st.write("")
-    
     col_foto, col_info = st.columns([1, 3])
-    
     with col_foto:
         if foto_upload is not None:
             st.image(foto_upload, width=180)
         else:
             st.markdown(f"""
-            <div style="
-                width: 180px; height: 180px; border-radius: 50%; 
-                background-color: {CARD_DARK}; border: 3px dashed {BORDER_DARK}; 
-                display: flex; align-items: center; justify-content: center; 
-                color: {TEXT_MUTED}; font-size: 0.85rem; text-align: center;">
+            <div style="width: 180px; height: 180px; border-radius: 50%; background-color: {CARD_DARK}; border: 3px dashed {BORDER_DARK}; display: flex; align-items: center; justify-content: center; color: {TEXT_MUTED}; font-size: 0.85rem; text-align: center;">
                 📸 Envie a foto na barra lateral
             </div>
             """, unsafe_allow_html=True)
-
     with col_info:
         st.markdown(f"""
         <div class="id-card">
@@ -276,18 +281,13 @@ with tab1:
         </div>
         """, unsafe_allow_html=True)
 
-# ----------------------------------------------------
-# SLIDE 2: META & FATURAMENTO (CARD EXECUTIVO VISÍVEL)
-# ----------------------------------------------------
 with tab2:
     st.subheader("2. META | FATURAMENTO — MÊS ATUAL")
-
     pct_realizado = (faturado / meta * 100) if meta > 0 else 0.0
     pct_projecao = (projecao / meta * 100) if meta > 0 else 0.0
     gap_projecao = projecao - meta
     delta_pct = pct_realizado - 100
 
-    # ===== EXIBIÇÃO CLEAN DOS VALORES FINANCEIROS =====
     k1, k2, k3 = st.columns(3)
     with k1:
         st.markdown(f"""
@@ -298,7 +298,6 @@ with tab2:
             </div>
         </div>
         """, unsafe_allow_html=True)
-
     with k2:
         st.markdown(f"""
         <div class="kpi-card" style="border-left: 4px solid {GREEN_NEON};">
@@ -308,7 +307,6 @@ with tab2:
             </div>
         </div>
         """, unsafe_allow_html=True)
-
     with k3:
         st.markdown(f"""
         <div class="kpi-card" style="border-left: 4px solid {NAVY_ACCENT};">
@@ -320,8 +318,6 @@ with tab2:
         """, unsafe_allow_html=True)
 
     st.divider()
-
-    # ===== INDICADORES CIRCULARES E GAP =====
     m1, m2, m3 = st.columns(3)
     cor_bola_bg = "linear-gradient(135deg, #166534 0%, #22C55E 100%)" if pct_realizado >= 100 else "linear-gradient(135deg, #991B1B 0%, #EF4444 100%)"
     cor_badge_bg = "#14532D" if delta_pct >= 0 else "#7F1D1D"
@@ -339,7 +335,6 @@ with tab2:
             </span>
         </div>
         """.replace(".", ","), unsafe_allow_html=True)
-
     with m2:
         st.markdown(f"""
         <div style="text-align: center; background: #1E293B; padding: 20px; border-radius: 14px; border: 1px solid {BORDER_DARK};">
@@ -350,7 +345,6 @@ with tab2:
             <span style="color: {TEXT_MUTED}; font-size: 0.85rem; font-weight: 600;">Projeção de Fechamento</span>
         </div>
         """.replace(".", ","), unsafe_allow_html=True)
-
     with m3:
         cor_gap = "#4ADE80" if gap_projecao >= 0 else "#FCA5A5"
         st.markdown(f"""
@@ -365,23 +359,17 @@ with tab2:
         </div>
         """, unsafe_allow_html=True)
 
-# ----------------------------------------------------
-# SLIDE 3: EVOLUÇÃO HISTÓRICA (VALORES EM "k" NO TOPO)
-# ----------------------------------------------------
 with tab3:
     st.subheader("3. META | FATURAMENTO — EVOLUÇÃO HISTÓRICA")
-
     idx_mes = months.index(mes_input)
     st.session_state.df_historico.loc[idx_mes, "Fat. Total"] = faturado
 
-    # Recalcular métricas
     df_calc = st.session_state.df_historico.copy()
     df_calc["% Total"] = np.where(df_calc["Meta Total"] > 0, (df_calc["Fat. Total"] / df_calc["Meta Total"]) * 100, 0.0)
     df_calc["UP"] = np.maximum(df_calc["Fat. Total"] - df_calc["Meta Total"], 0)
     df_calc["LOSS"] = np.maximum(df_calc["Meta Total"] - df_calc["Fat. Total"], 0)
     st.session_state.df_historico = df_calc
 
-    # Tabela Editável
     st.session_state.df_historico = st.data_editor(
         st.session_state.df_historico,
         use_container_width=True,
@@ -397,7 +385,6 @@ with tab3:
         }
     )
 
-    # ===== FORMATAÇÃO ABREVIADA (ex: 369k) =====
     valores_k = []
     for v in st.session_state.df_historico["Fat. Total"]:
         if v >= 1000:
@@ -407,25 +394,20 @@ with tab3:
         else:
             valores_k.append("")
 
-    # Mêses Abreviados para o Eixo X
     meses_abrev = [m[:3] for m in st.session_state.df_historico["Mês"]]
 
     fig = go.Figure()
-    
-    # Barras com valores no TOPO
     fig.add_trace(go.Bar(
         x=meses_abrev,
         y=st.session_state.df_historico["Fat. Total"],
         name="Faturado Alcançado",
         marker_color=GREEN_NEON,
         text=valores_k,
-        textposition="outside",  # Coloca o texto em cima da barra
+        textposition="outside",
         textfont=dict(size=13, color="#FFFFFF", family="Arial Black"),
         width=0.45,
         hovertemplate="<b>%{x}</b><br>Faturado: R$ %{y:,.2f}<extra></extra>"
     ))
-
-    # Linha de Tendência
     fig.add_trace(go.Scatter(
         x=meses_abrev,
         y=st.session_state.df_historico["Fat. Total"],
@@ -436,7 +418,6 @@ with tab3:
         hovertemplate="<b>%{x}</b><br>Tendência: R$ %{y:,.2f}<extra></extra>"
     ))
 
-    # Teto do eixo Y para os rótulos não cortarem na borda superior
     max_val = st.session_state.df_historico["Fat. Total"].max()
     teto_y = (max_val * 1.18) if max_val > 0 else 100000
 
@@ -453,12 +434,8 @@ with tab3:
 
     st.plotly_chart(fig, use_container_width=True)
 
-# ----------------------------------------------------
-# SLIDE 4: TOP 5 CLIENTES
-# ----------------------------------------------------
 with tab4:
     st.subheader("4. PRINCIPAIS CLIENTES (TOP 5)")
-
     st.session_state.clientes = st.data_editor(
         st.session_state.clientes,
         num_rows="fixed",
@@ -475,12 +452,8 @@ with tab4:
         }
     )
 
-# ----------------------------------------------------
-# SLIDE 5: NOVOS CLIENTES FECHADOS
-# ----------------------------------------------------
 with tab5:
     st.subheader("5. NOVOS CLIENTES FECHADOS NO MÊS")
-
     st.session_state.fechados = st.data_editor(
         st.session_state.fechados,
         num_rows="dynamic",
@@ -493,12 +466,8 @@ with tab5:
         }
     )
 
-# ----------------------------------------------------
-# SLIDE 6: PIPELINE
-# ----------------------------------------------------
 with tab6:
     st.subheader("6. PRÓXIMOS FECHAMENTOS (PIPELINE / UPCOMING)")
-
     st.session_state.upcoming = st.data_editor(
         st.session_state.upcoming,
         num_rows="dynamic",
@@ -510,12 +479,8 @@ with tab6:
         }
     )
 
-# ----------------------------------------------------
-# SLIDE 7: EXPORTAÇÃO
-# ----------------------------------------------------
 with tab7:
     st.subheader("7. Exportação dos Dados")
-
     buffer_excel = BytesIO()
     with pd.ExcelWriter(buffer_excel, engine="xlsxwriter") as writer:
         st.session_state.df_historico.to_excel(writer, sheet_name="Historico", index=False)
