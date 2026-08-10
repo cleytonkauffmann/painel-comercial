@@ -216,11 +216,9 @@ with st.sidebar:
         st.caption("💡 Digite com vírgula (ex: 369434,39)")
         meta_str = st.text_input("📌 META DA GERÊNCIA (R$)", value="500.000,00")
         faturado_str = st.text_input("💰 FATURADO ALCANÇADO (R$)", value=fmt_br(st.session_state.faturado_auto))
-        projecao_str = st.text_input("📈 PROJEÇÃO MÊS (R$)", value=faturado_str)
 
         meta = parse_br_to_float(meta_str)
         faturado = parse_br_to_float(faturado_str)
-        projecao = parse_br_to_float(projecao_str)
 
 # ===== HEADER PRINCIPAL =====
 st.markdown(f"""
@@ -284,11 +282,10 @@ with tab1:
 with tab2:
     st.subheader("2. META | FATURAMENTO — MÊS ATUAL")
     pct_realizado = (faturado / meta * 100) if meta > 0 else 0.0
-    pct_projecao = (projecao / meta * 100) if meta > 0 else 0.0
-    gap_projecao = projecao - meta
     delta_pct = pct_realizado - 100
+    gap_meta = faturado - meta
 
-    k1, k2, k3 = st.columns(3)
+    k1, k2 = st.columns(2)
     with k1:
         st.markdown(f"""
         <div class="kpi-card">
@@ -307,18 +304,9 @@ with tab2:
             </div>
         </div>
         """, unsafe_allow_html=True)
-    with k3:
-        st.markdown(f"""
-        <div class="kpi-card" style="border-left: 4px solid {NAVY_ACCENT};">
-            <span style="color: {TEXT_MUTED}; font-size: 0.85rem; font-weight: 700; text-transform: uppercase;">📈 PROJEÇÃO MÊS</span>
-            <div class="executive-font" style="font-size: 1.85rem; color: {NAVY_ACCENT}; margin-top: 8px;">
-                R$ {fmt_br(projecao)}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
 
     st.divider()
-    m1, m2, m3 = st.columns(3)
+    m1, m2 = st.columns(2)
     cor_bola_bg = "linear-gradient(135deg, #166534 0%, #22C55E 100%)" if pct_realizado >= 100 else "linear-gradient(135deg, #991B1B 0%, #EF4444 100%)"
     cor_badge_bg = "#14532D" if delta_pct >= 0 else "#7F1D1D"
     cor_badge_txt = "#4ADE80" if delta_pct >= 0 else "#FCA5A5"
@@ -336,25 +324,15 @@ with tab2:
         </div>
         """.replace(".", ","), unsafe_allow_html=True)
     with m2:
+        cor_gap = "#4ADE80" if gap_meta >= 0 else "#FCA5A5"
         st.markdown(f"""
         <div style="text-align: center; background: #1E293B; padding: 20px; border-radius: 14px; border: 1px solid {BORDER_DARK};">
-            <span style="font-size: 0.85rem; font-weight: 700; color: {TEXT_MUTED}; text-transform: uppercase;">PROJEÇÃO DA META %</span>
-            <div style="width: 120px; height: 120px; background: linear-gradient(135deg, #0369A1 0%, #38BDF8 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 15px auto;">
-                <span style="color: #FFFFFF; font-size: 1.6rem; font-weight: 800;">{pct_projecao:.1f}%</span>
-            </div>
-            <span style="color: {TEXT_MUTED}; font-size: 0.85rem; font-weight: 600;">Projeção de Fechamento</span>
-        </div>
-        """.replace(".", ","), unsafe_allow_html=True)
-    with m3:
-        cor_gap = "#4ADE80" if gap_projecao >= 0 else "#FCA5A5"
-        st.markdown(f"""
-        <div style="text-align: center; background: #1E293B; padding: 20px; border-radius: 14px; border: 1px solid {BORDER_DARK};">
-            <span style="font-size: 0.85rem; font-weight: 700; color: {TEXT_MUTED}; text-transform: uppercase;">GAP (PROJEÇÃO x META)</span>
+            <span style="font-size: 0.85rem; font-weight: 700; color: {TEXT_MUTED}; text-transform: uppercase;">GAP (FATURADO x META)</span>
             <div style="height: 120px; display: flex; align-items: center; justify-content: center; margin: 15px auto;">
-                <span style="color: #FFFFFF; font-size: 2.0rem; font-weight: 800;">R$ {fmt_br(gap_projecao)}</span>
+                <span style="color: #FFFFFF; font-size: 2.0rem; font-weight: 800;">R$ {fmt_br(gap_meta)}</span>
             </div>
             <span style="background-color: {cor_badge_bg}; color: {cor_gap}; padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; font-weight: 700;">
-                {"↑" if gap_projecao >= 0 else "↓"} R$ {fmt_br(gap_projecao)}
+                {"↑" if gap_meta >= 0 else "↓"} R$ {fmt_br(gap_meta)}
             </span>
         </div>
         """, unsafe_allow_html=True)
