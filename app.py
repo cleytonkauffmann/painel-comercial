@@ -29,6 +29,7 @@ st.markdown(f"""
 .block-container {{ padding-top: 1.5rem; max-width: 1350px; }}
 h1, h2, h3, h4, h5 {{ color: {TEXT_MAIN} !important; font-family: 'Segoe UI', Roboto, sans-serif; }}
 
+/* Cabeçalho principal */
 .header-slide {{
     background: linear-gradient(135deg, #0284C7 0%, #0F172A 100%);
     border-left: 8px solid {GREEN_NEON};
@@ -61,6 +62,16 @@ h1, h2, h3, h4, h5 {{ color: {TEXT_MAIN} !important; font-family: 'Segoe UI', Ro
     background-color: {GREEN_NEON} !important;
     color: #000000 !important;
     font-weight: 800;
+}}
+
+/* Formatação da Foto Arredondada */
+[data-testid="stImage"] img {{
+    border-radius: 50% !important;
+    width: 150px !important;
+    height: 150px !important;
+    object-fit: cover !important;
+    border: 3px solid {GREEN_NEON} !important;
+    box-shadow: 0px 4px 10px rgba(0,0,0,0.3);
 }}
 
 .stTextInput label, .stSelectbox label, .stNumberInput label, .stDateInput label {{
@@ -127,7 +138,7 @@ if "faturado_auto" not in st.session_state:
 
 # ===== IMPORTAÇÃO DA PLANILHA (EXPANDER FIXO NO TOPO) =====
 with st.expander("📂 Importar Dados da Planilha (.xlsx)", expanded=False):
-    uploaded_file = st.file_uploader("Arraste ou selecione a planilha", type=["xlsx"])
+    uploaded_file = st.file_uploader("Arraste ou selecione a planilha Excel", type=["xlsx"])
     if uploaded_file:
         try:
             excel_data = pd.read_excel(uploaded_file, sheet_name=None)
@@ -186,16 +197,44 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
 ])
 
 # ----------------------------------------------------
-# SLIDE 1: IDENTIFICAÇÃO
+# SLIDE 1: IDENTIFICAÇÃO (COM FOTO ARREDONDADA)
 # ----------------------------------------------------
 with tab1:
     st.subheader("1. Identificação do Executivo")
-    c1, c2, c3 = st.columns([2, 1, 1])
-    with c1:
-        nome = st.text_input("NOME DO EXECUTIVO / KAM", value="Cleyton Kauffmann")
-    with c2:
-        mes = st.selectbox("MÊS DE REFERÊNCIA", months, index=7)
-    with c3:
+    
+    col_foto, col_campos = st.columns([1, 3])
+    
+    with col_foto:
+        foto_upload = st.file_uploader("Sua Foto", type=["png", "jpg", "jpeg"])
+        
+        if foto_upload is not None:
+            st.image(foto_upload, width=150)
+        else:
+            st.markdown("""
+            <div style="
+                width: 150px; 
+                height: 150px; 
+                border-radius: 50%; 
+                background-color: #1E293B; 
+                border: 2px dashed #334155; 
+                display: flex; 
+                align-items: center; 
+                justify-content: center; 
+                color: #94A3B8; 
+                font-size: 0.85rem; 
+                text-align: center; 
+                margin-bottom: 10px;">
+                📸 Envie sua foto
+            </div>
+            """, unsafe_allow_html=True)
+
+    with col_campos:
+        c1, c2 = st.columns([2, 1])
+        with c1:
+            nome = st.text_input("NOME DO EXECUTIVO / KAM", value="Cleyton Kauffmann")
+        with c2:
+            mes = st.selectbox("MÊS DE REFERÊNCIA", months, index=7)
+        
         data_ref = st.date_input("DATA DE APRESENTAÇÃO")
 
 # ----------------------------------------------------
@@ -294,7 +333,7 @@ with tab3:
         }
     )
 
-    # Gráfico Ajustado (Com rótulos embaixo/dentro da barra)
+    # Gráfico Ajustado (Com rótulos na base/parte inferior da barra)
     valores_formatados = [f"R$ {fmt_br(v)}" if v > 0 else "" for v in st.session_state.df_historico["Fat. Total"]]
 
     fig = go.Figure()
