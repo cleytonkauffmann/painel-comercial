@@ -20,7 +20,6 @@ st.set_page_config(page_title="Apresentação Comercial - KAO", page_icon="🚚"
 # ===== Identidade Visual =====
 NAVY = "#102A43"
 GREEN = "#1E8449"
-DARK_BAR = "#1F2937"
 GRAY = "#5D6D7E"
 
 st.markdown(f"""
@@ -276,24 +275,15 @@ st.session_state.df_historico = st.data_editor(
         "UP": st.column_config.NumberColumn("UP (R$)", format="R$ %,.2f", disabled=True),
         "LOSS": st.column_config.NumberColumn("LOSS (R$)", format="R$ %,.2f", disabled=True),
     },
-    key="editor_historico_v4"
+    key="editor_historico_v5"
 )
 
-st.markdown("#### Evolução Mensal (Meta vs Faturado)")
+st.markdown("#### Evolução Mensal (Faturado Alcançado)")
 
-# ===== GRÁFICO (DUAS BARRAS LADO A LADO + LINHA TRACEJADA ENTRE BARRAS DE FATURADO) =====
+# ===== GRÁFICO (SOMENTE BARRA DO FATURADO + LINHA TRACEJADA) =====
 fig = go.Figure()
 
-# 1. Barra da META (Preto / Grafite)
-fig.add_trace(go.Bar(
-    x=st.session_state.df_historico["Mês"],
-    y=st.session_state.df_historico["Meta Total"],
-    name="Meta Total",
-    marker_color=DARK_BAR,
-    hovertemplate="Mês: %{x}<br>Meta: R$ %{y:,.2f}<extra></extra>"
-))
-
-# 2. Barra do ALCANÇADO (Verde)
+# 1. Barra do FATURADO ALCANÇADO (Verde)
 fig.add_trace(go.Bar(
     x=st.session_state.df_historico["Mês"],
     y=st.session_state.df_historico["Fat. Total"],
@@ -302,7 +292,7 @@ fig.add_trace(go.Bar(
     hovertemplate="Mês: %{x}<br>Alcançado: R$ %{y:,.2f}<extra></extra>"
 ))
 
-# 3. Linha Tracejada Conectando as Barras do Faturado (Tendência)
+# 2. Linha Tracejada Conectando as Barras de Faturado (Tendência)
 fig.add_trace(go.Scatter(
     x=st.session_state.df_historico["Mês"],
     y=st.session_state.df_historico["Fat. Total"],
@@ -314,7 +304,6 @@ fig.add_trace(go.Scatter(
 ))
 
 fig.update_layout(
-    barmode='group',
     xaxis=dict(
         categoryorder="array",
         categoryarray=months
