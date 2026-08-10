@@ -25,7 +25,7 @@ NAVY_ACCENT = "#38BDF8"
 
 st.markdown(f"""
 <style>
-/* Definição visual para títulos estilizados */
+/* Estilização Geral */
 .stApp {{ background-color: {BG_DARK}; color: {TEXT_MAIN}; }}
 .block-container {{ padding-top: 1.5rem; max-width: 1350px; }}
 h1, h2, h3, h4, h5 {{ color: {TEXT_MAIN} !important; font-family: 'Amasis MT Pro', 'Georgia', serif; }}
@@ -72,14 +72,19 @@ h1, h2, h3, h4, h5 {{ color: {TEXT_MAIN} !important; font-family: 'Amasis MT Pro
     font-weight: 800;
 }}
 
-/* Foto de Perfil Arredondada */
-.profile-img {{
-    width: 180px;
-    height: 180px;
-    border-radius: 50%;
-    object-fit: cover;
-    border: 4px solid {GREEN_NEON};
-    box-shadow: 0px 8px 20px rgba(0,0,0,0.4);
+/* Card de Destaque Financeiro */
+.kpi-card {{
+    background-color: {CARD_DARK};
+    border: 1px solid {BORDER_DARK};
+    padding: 20px;
+    border-radius: 14px;
+    text-align: center;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    transition: transform 0.2s ease-in-out;
+}}
+
+.kpi-card:hover {{
+    border-color: {GREEN_NEON};
 }}
 
 /* Card da Identificação Clean */
@@ -136,17 +141,22 @@ if "upcoming" not in st.session_state:
     ])
 
 if "faturado_auto" not in st.session_state:
-    st.session_state.faturado_auto = 382000.00
+    st.session_state.faturado_auto = 369434.39
 
-# ===== BARRA LATERAL (SIDEBAR): TODOS OS FORMULÁRIOS E UPLOADS =====
+# ===== BARRA LATERAL (SIDEBAR): TODOS OS CONTROLES =====
 with st.sidebar:
     st.header("⚙️ Painel de Controle")
     
-    with st.expander("👤 Dados da Identificação", expanded=True):
+    with st.expander("👤 Dados da Identificação", expanded=False):
         nome_input = st.text_input("Nome do Executivo / KAM", value="Cleyton Kauffmann")
         mes_input = st.selectbox("Mês de Referência", months, index=7)
         data_ref = st.date_input("Data de Apresentação")
         foto_upload = st.file_uploader("Foto de Perfil", type=["png", "jpg", "jpeg"])
+
+    with st.expander("🎯 Valores de Meta & Faturamento", expanded=True):
+        meta = st.number_input("📌 META DA GERÊNCIA (R$)", min_value=0.0, value=500000.00, step=1000.0)
+        faturado = st.number_input("💰 FATURADO ALCANÇADO (R$)", min_value=0.0, value=float(st.session_state.faturado_auto), step=1000.0)
+        projecao = st.number_input("📈 PROJEÇÃO MÊS (R$)", min_value=0.0, value=faturado, step=1000.0)
 
     with st.expander("📂 Importar Planilha Excel", expanded=False):
         uploaded_file = st.file_uploader("Arquivo .xlsx", type=["xlsx"])
@@ -268,26 +278,51 @@ with tab1:
         """, unsafe_allow_html=True)
 
 # ----------------------------------------------------
-# SLIDE 2: META & FATURAMENTO
+# SLIDE 2: META & FATURAMENTO (VISUAL 100% CLEAN)
 # ----------------------------------------------------
 with tab2:
     st.subheader("2. META | FATURAMENTO — MÊS ATUAL")
-
-    col_meta, col_fat, col_proj = st.columns(3)
-    with col_meta:
-        meta = st.number_input("📌 META DA GERÊNCIA (R$)", min_value=0.0, value=382658.00, step=1000.0)
-    with col_fat:
-        faturado = st.number_input("💰 FATURADO ALCANÇADO (R$)", min_value=0.0, value=float(st.session_state.faturado_auto), step=1000.0)
-    with col_proj:
-        projecao = st.number_input("📈 PROJEÇÃO MÊS (R$)", min_value=0.0, value=faturado, step=1000.0)
 
     pct_realizado = (faturado / meta * 100) if meta > 0 else 0.0
     pct_projecao = (projecao / meta * 100) if meta > 0 else 0.0
     gap_projecao = projecao - meta
     delta_pct = pct_realizado - 100
 
+    # ===== EXIBIÇÃO CLEAN DOS VALORES FINANCEIROS =====
+    k1, k2, k3 = st.columns(3)
+    with k1:
+        st.markdown(f"""
+        <div class="kpi-card">
+            <span style="color: {TEXT_MUTED}; font-size: 0.85rem; font-weight: 700; text-transform: uppercase;">📌 META DA GERÊNCIA</span>
+            <div class="executive-font" style="font-size: 1.85rem; color: #FFFFFF; margin-top: 8px;">
+                R$ {fmt_br(meta)}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with k2:
+        st.markdown(f"""
+        <div class="kpi-card" style="border-left: 4px solid {GREEN_NEON};">
+            <span style="color: {TEXT_MUTED}; font-size: 0.85rem; font-weight: 700; text-transform: uppercase;">💰 FATURADO ALCANÇADO</span>
+            <div class="executive-font" style="font-size: 1.85rem; color: {GREEN_NEON}; margin-top: 8px;">
+                R$ {fmt_br(faturado)}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with k3:
+        st.markdown(f"""
+        <div class="kpi-card" style="border-left: 4px solid {NAVY_ACCENT};">
+            <span style="color: {TEXT_MUTED}; font-size: 0.85rem; font-weight: 700; text-transform: uppercase;">📈 PROJEÇÃO MÊS</span>
+            <div class="executive-font" style="font-size: 1.85rem; color: {NAVY_ACCENT}; margin-top: 8px;">
+                R$ {fmt_br(projecao)}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
     st.divider()
 
+    # ===== INDICADORES CIRCULARES E GAP =====
     m1, m2, m3 = st.columns(3)
     cor_bola_bg = "linear-gradient(135deg, #166534 0%, #22C55E 100%)" if pct_realizado >= 100 else "linear-gradient(135deg, #991B1B 0%, #EF4444 100%)"
     cor_badge_bg = "#14532D" if delta_pct >= 0 else "#7F1D1D"
