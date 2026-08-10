@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from io import BytesIO
-import pptx
+from pptx import Presentation
 from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
 
@@ -84,6 +84,9 @@ if "clientes" not in st.session_state:
         for i in range(5)
     ])
 
+if "faturado_auto" not in st.session_state:
+    st.session_state.faturado_auto = 0.0
+
 if "fechados" not in st.session_state:
     st.session_state.fechados = pd.DataFrame([
         {"CLIENTE": "", "PROJEÇÃO MÊS": 0.0, "FATURADO MÊS": 0.0, "PRODUTO": "", "ORIGEM": "", "DESTINO": ""}
@@ -97,16 +100,62 @@ if "upcoming" not in st.session_state:
     ])
 
 # ===== SEÇÃO 0: IMPORTAÇÃO DE DADOS =====
-with st.expander("📂 Importar Dados de Planilha Excel (Carga Rápida)", expanded=False):
+with st.expander("📂 Importar Dados de Planilha Excel (Carga Rápida)", expanded=True):
     uploaded_file = st.file_uploader("Arraste ou selecione a planilha (.xlsx)", type=["xlsx"])
     if uploaded_file:
         try:
             excel_data = pd.read_excel(uploaded_file, sheet_name=None)
-            st.success("Planilha carregada com sucesso!")
+            
+            # Se a planilha contiver a aba 'Export' do sistema KAO
             if "Export" in excel_data:
-                st.session_state["df_export_imported"] = excel_data["Export"]
+                df_export = excel_data["Export"]
+                
+                if "Razão Grupo" in df_export.columns:
+                    # Filtrar linhas válidas (desconsiderar totais e textos de filtro)
+                    df_valid = df_export[
+                        df_export["Razão Grupo"].notna() & 
+                        (~df_export["Razão Grupo"].astype(str).str.startswith("Total")) &
+                        (~df_export["Razão Grupo"].astype(str).str.startswith("Filtros"))
+                    ].copy()
+
+                    # Converter colunas numéricas
+                    df_valid["Mês atual"] = pd.to_numeric(df_valid["Mês atual"], errors='coerce').fillna(0.0)
+                    df_valid["Mês anterior"] = pd.to_numeric(df_valid["Mês anterior"], errors='coerce').fillna(0.0)
+
+                    # 1. Extrair os TOP 5 Clientes ordenados pela receita do mês atual
+                    top5 = df_valid.sort_values(by="Mês atual", ascending=False).head(5)
+
+                    novos_clientes = []
+                    for idx, row in top5.iterrows():
+                        novos_clientes.append({
+                            "CLIENTE": str(row["Razão Grupo"]),
+                            "RECEITA": float(row["Mês atual"]),
+                            "MÊS ANTERIOR": float(row["Mês anterior"]),
+                            "ANO ANTERIOR": 0.0,
+                            "RENTABILIDADE": 0.0,
+                            "SLA": 0.0,
+                            "CONSIDERAÇÕES": ""
+                        })
+
+                    # Completar até 5 linhas caso a planilha tenha menos clientes
+                    while len(novos_clientes) < 5:
+                        novos_clientes.append({
+                            "CLIENTE": "", "RECEITA": 0.0, "MÊS ANTERIOR": 0.0,
+                            "ANO ANTERIOR": 0.0, "RENTABILIDADE": 0.0, "SLA": 0.0, "CONSIDERAÇÕES": ""
+                        })
+
+                    st.session_state.clientes = pd.DataFrame(novos_clientes)
+
+                    # 2. Extrair o Faturado Total da Carteira Geral
+                    faturado_total = float(df_valid["Mês atual"].sum())
+                    st.session_state.faturado_auto = faturado_total
+
+                    st.success("✅ Dados importados com sucesso! TOP 5 Clientes e Faturado Total foram atualizados automaticamente.")
+
             elif "Historico" in excel_data:
                 st.session_state.df_historico = excel_data["Historico"]
+                st.success("✅ Histórico carregado!")
+                
         except Exception as e:
             st.error(f"Erro ao ler arquivo: {e}")
 
@@ -125,7 +174,7 @@ st.markdown('</div>', unsafe_allow_html=True)
 # ===== SEÇÃO 2: META | FATURAMENTO (MÊS ATUAL) =====
 st.markdown('<div class="section-card">', unsafe_allow_html=True)
 st.subheader("2. META | FATURAMENTO - MÊS ATUAL")
-st.caption("A Meta é definida previamente pela Gerência. Insira o Faturado Alcançado para apurar o resultado.")
+st.caption("A Meta é definida previamente pela Gerência. O Faturado é preenchido automaticamente ao importar a planilha.")
 
 col_meta, col_fat, col_proj = st.columns(3)
 
@@ -133,7 +182,12 @@ with col_meta:
     meta = st.number_input("📌 META DA GERÊNCIA (R$)", min_value=0.0, value=350658.00, step=1000.0)
 
 with col_fat:
-    faturado = st.number_input("💰 FATURADO ALCANÇADO (R$)", min_value=0.0, value=0.0, step=1000.0)
+    faturado = st.number_input(
+        "💰 FATURADO ALCANÇADO (R$)", 
+        min_value=0.0, 
+        value=st.session_state.get("faturado_auto", 0.0), 
+        step=1000.0
+    )
 
 with col_proj:
     projecao = st.number_input("📈 PROJEÇÃO MÊS (R$)", min_value=0.0, value=faturado, step=1000.0)
@@ -186,13 +240,13 @@ with c_auto1:
         st.rerun()
 
 with c_auto2:
-    mes_lançamento = st.selectbox("Lançar Faturado no Mês", months, key="sel_mes_lanc")
-    valor_fat_lanc = st.number_input("Valor Faturado (R$)", min_value=0.0, step=1000.0, key="input_fat_lanc")
+    mes_lancamento = st.selectbox("Lançar Faturado no Mês", months, index=months.index(mes), key="sel_mes_lanc")
+    valor_fat_lanc = st.number_input("Valor Faturado (R$)", min_value=0.0, value=float(faturado), step=1000.0, key="input_fat_lanc")
     if st.button("💾 Salvar Faturamento do Mês", use_container_width=True):
-        idx = st.session_state.df_historico[st.session_state.df_historico["Mês"] == mes_lançamento].index
+        idx = st.session_state.df_historico[st.session_state.df_historico["Mês"] == mes_lancamento].index
         if len(idx) > 0:
             st.session_state.df_historico.loc[idx[0], "Fat. Total"] = valor_fat_lanc
-            st.success(f"Faturado de {mes_lançamento} atualizado para R$ {fmt_br(valor_fat_lanc)}!")
+            st.success(f"Faturado de {mes_lancamento} atualizado para R$ {fmt_br(valor_fat_lanc)}!")
             st.rerun()
 
 with c_auto3:
@@ -254,12 +308,13 @@ st.session_state.clientes = st.data_editor(
 
 df_valid_cli = st.session_state.clientes[st.session_state.clientes["CLIENTE"].astype(str).str.strip() != ""]
 tot_top5 = df_valid_cli["RECEITA"].sum()
+tot_carteira = st.session_state.get("faturado_auto", tot_top5)
 
 c_tot1, c_tot2 = st.columns(2)
 with c_tot1:
     st.metric("TOTAL TOP 5 CLIENTES", f"R$ {fmt_br(tot_top5)}")
 with c_tot2:
-    st.metric("TOTAL CARTEIRA GERAL", f"R$ {fmt_br(tot_top5)}")
+    st.metric("TOTAL CARTEIRA GERAL", f"R$ {fmt_br(tot_carteira)}")
 st.markdown('</div>', unsafe_allow_html=True)
 
 # ===== SEÇÃO 5: PIPELINE & UPCOMING =====
