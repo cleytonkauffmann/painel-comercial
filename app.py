@@ -17,10 +17,10 @@ def fmt_br(valor):
 # ===== Configuração da Página =====
 st.set_page_config(page_title="Apresentação Comercial - KAO", page_icon="🚚", layout="wide")
 
-# ===== Identidade Visual (Alinhada aos Slides KAO) =====
+# ===== Identidade Visual =====
 NAVY = "#102A43"
 GREEN = "#1E8449"
-BLUE = "#1F5A94"
+DARK_BAR = "#1F2937"
 GRAY = "#5D6D7E"
 
 st.markdown(f"""
@@ -107,23 +107,21 @@ with st.expander("📂 Importar Dados de Planilha Excel (Carga Rápida)", expand
         try:
             excel_data = pd.read_excel(uploaded_file, sheet_name=None)
             
-            # Se a planilha contiver a aba 'Export' do sistema KAO
+            # Se a planilha contiver a aba 'Export'
             if "Export" in excel_data:
                 df_export = excel_data["Export"]
                 
                 if "Razão Grupo" in df_export.columns:
-                    # Filtrar linhas válidas (desconsiderar totais e textos de filtro)
                     df_valid = df_export[
                         df_export["Razão Grupo"].notna() & 
                         (~df_export["Razão Grupo"].astype(str).str.startswith("Total")) &
                         (~df_export["Razão Grupo"].astype(str).str.startswith("Filtros"))
                     ].copy()
 
-                    # Converter colunas numéricas
                     df_valid["Mês atual"] = pd.to_numeric(df_valid["Mês atual"], errors='coerce').fillna(0.0)
                     df_valid["Mês anterior"] = pd.to_numeric(df_valid["Mês anterior"], errors='coerce').fillna(0.0)
 
-                    # 1. Extrair os TOP 5 Clientes ordenados pela receita do mês atual
+                    # Top 5 Clientes
                     top5 = df_valid.sort_values(by="Mês atual", ascending=False).head(5)
 
                     novos_clientes = []
@@ -138,7 +136,6 @@ with st.expander("📂 Importar Dados de Planilha Excel (Carga Rápida)", expand
                             "CONSIDERAÇÕES": ""
                         })
 
-                    # Completar até 5 linhas caso a planilha tenha menos clientes
                     while len(novos_clientes) < 5:
                         novos_clientes.append({
                             "CLIENTE": "", "RECEITA": 0.0, "MÊS ANTERIOR": 0.0,
@@ -147,11 +144,11 @@ with st.expander("📂 Importar Dados de Planilha Excel (Carga Rápida)", expand
 
                     st.session_state.clientes = pd.DataFrame(novos_clientes)
 
-                    # 2. Extrair o Faturado Total da Carteira Geral
+                    # Faturado Total da Carteira
                     faturado_total = float(df_valid["Mês atual"].sum())
                     st.session_state.faturado_auto = faturado_total
 
-                    st.success("✅ Dados importados com sucesso! TOP 5 Clientes e Faturado Total foram atualizados automaticamente.")
+                    st.success("✅ Dados importados com sucesso! TOP 5 Clientes e Faturado Total atualizados.")
 
             elif "Historico" in excel_data:
                 st.session_state.df_historico = excel_data["Historico"]
@@ -175,7 +172,7 @@ st.markdown('</div>', unsafe_allow_html=True)
 # ===== SEÇÃO 2: META | FATURAMENTO (MÊS ATUAL) =====
 st.markdown('<div class="section-card">', unsafe_allow_html=True)
 st.subheader("2. META | FATURAMENTO - MÊS ATUAL")
-st.caption("A Meta é definida previamente pela Gerência. O Faturado é preenchido automaticamente ao importar a planilha.")
+st.caption("A Meta é definida pela Gerência. O Faturado é preenchido automaticamente ao importar a planilha.")
 
 col_meta, col_fat, col_proj = st.columns(3)
 
@@ -193,7 +190,6 @@ with col_fat:
 with col_proj:
     projecao = st.number_input("📈 PROJEÇÃO MÊS (R$)", min_value=0.0, value=faturado, step=1000.0)
 
-# Cálculos da Seção Meta
 pct_realizado = (faturado / meta * 100) if meta > 0 else 0.0
 pct_projecao = (projecao / meta * 100) if meta > 0 else 0.0
 gap_projecao = projecao - meta
@@ -220,7 +216,7 @@ with m3:
     )
 st.markdown('</div>', unsafe_allow_html=True)
 
-# ===== SEÇÃO 3: EVOLUÇÃO HISTÓRICA (COM PREENCHIMENTO AUTOMÁTICO) =====
+# ===== SEÇÃO 3: EVOLUÇÃO HISTÓRICA =====
 st.markdown('<div class="section-card">', unsafe_allow_html=True)
 st.subheader("3. META | FATURAMENTO — EVOLUÇÃO HISTÓRICA")
 
@@ -259,7 +255,7 @@ with c_auto3:
 
 st.divider()
 
-# Cálculos Automáticos de UP, LOSS e %
+# Cálculo de UP, LOSS e %
 df_calc = st.session_state.df_historico.copy()
 df_calc["% Total"] = np.where(df_calc["Meta Total"] > 0, (df_calc["Fat. Total"] / df_calc["Meta Total"]) * 100, 0.0)
 df_calc["UP"] = np.maximum(df_calc["Fat. Total"] - df_calc["Meta Total"], 0)
@@ -280,46 +276,45 @@ st.session_state.df_historico = st.data_editor(
         "UP": st.column_config.NumberColumn("UP (R$)", format="R$ %,.2f", disabled=True),
         "LOSS": st.column_config.NumberColumn("LOSS (R$)", format="R$ %,.2f", disabled=True),
     },
-    key="editor_historico_v3"
+    key="editor_historico_v4"
 )
 
 st.markdown("#### Evolução Mensal (Meta vs Faturado)")
 
-# ===== GRÁFICO PERSONALIZADO (BARRAS VERDE ESCURO + LINHA TRACEJADA + ORDEM CRONOLÓGICA) =====
+# ===== GRÁFICO (DUAS BARRAS LADO A LADO + LINHA TRACEJADA ENTRE BARRAS DE FATURADO) =====
 fig = go.Figure()
 
-# 1. Barras em Verde Escuro para o Faturado
+# 1. Barra da META (Preto / Grafite)
+fig.add_trace(go.Bar(
+    x=st.session_state.df_historico["Mês"],
+    y=st.session_state.df_historico["Meta Total"],
+    name="Meta Total",
+    marker_color=DARK_BAR,
+    hovertemplate="Mês: %{x}<br>Meta: R$ %{y:,.2f}<extra></extra>"
+))
+
+# 2. Barra do ALCANÇADO (Verde)
 fig.add_trace(go.Bar(
     x=st.session_state.df_historico["Mês"],
     y=st.session_state.df_historico["Fat. Total"],
     name="Faturado Alcançado",
-    marker_color="#1E8449",
-    hovertemplate="Mês: %{x}<br>Faturado: R$ %{y:,.2f}<extra></extra>"
+    marker_color=GREEN,
+    hovertemplate="Mês: %{x}<br>Alcançado: R$ %{y:,.2f}<extra></extra>"
 ))
 
-# 2. Linha Tracejada Conectando de Barra a Barra (Topo a Topo)
+# 3. Linha Tracejada Conectando as Barras do Faturado (Tendência)
 fig.add_trace(go.Scatter(
     x=st.session_state.df_historico["Mês"],
     y=st.session_state.df_historico["Fat. Total"],
     name="Tendência Faturado",
     mode="lines+markers",
     line=dict(color="#145A32", dash="dash", width=2),
-    marker=dict(size=7, color="#145A32"),
+    marker=dict(size=6, color="#145A32"),
     hovertemplate="Mês: %{x}<br>Tendência: R$ %{y:,.2f}<extra></extra>"
 ))
 
-# 3. Linha Contínua para Meta Total
-fig.add_trace(go.Scatter(
-    x=st.session_state.df_historico["Mês"],
-    y=st.session_state.df_historico["Meta Total"],
-    name="Meta Total",
-    mode="lines",
-    line=dict(color="#102A43", width=3),
-    hovertemplate="Mês: %{x}<br>Meta: R$ %{y:,.2f}<extra></extra>"
-))
-
-# Configurações do layout e ordenação dos meses
 fig.update_layout(
+    barmode='group',
     xaxis=dict(
         categoryorder="array",
         categoryarray=months
@@ -381,7 +376,6 @@ st.session_state.fechados = st.data_editor(
     }
 )
 
-# Totais calculados para o Pipeline
 tot_proj_fechados = pd.to_numeric(st.session_state.fechados["PROJEÇÃO MÊS"], errors='coerce').fillna(0.0).sum()
 tot_fat_fechados = pd.to_numeric(st.session_state.fechados["FATURADO MÊS"], errors='coerce').fillna(0.0).sum()
 
@@ -405,7 +399,6 @@ st.session_state.upcoming = st.data_editor(
     }
 )
 
-# Total calculado para o Upcoming
 tot_proj_upcoming = pd.to_numeric(st.session_state.upcoming["PROJEÇÃO MÊS"], errors='coerce').fillna(0.0).sum()
 
 cu_tot1, _ = st.columns([1, 1])
@@ -420,7 +413,6 @@ st.subheader("6. EXPORTAR RELATÓRIO")
 
 col_exp1, col_exp2 = st.columns(2)
 
-# Exportar Excel
 with col_exp1:
     if st.button("📥 Gerar Excel Completo", use_container_width=True):
         output_xl = BytesIO()
@@ -448,7 +440,6 @@ with col_exp1:
             use_container_width=True
         )
 
-# Exportar PowerPoint (.pptx)
 with col_exp2:
     if st.button("📊 Gerar Apresentação PowerPoint (.pptx)", use_container_width=True):
         prs = Presentation()
