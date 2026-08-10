@@ -17,20 +17,19 @@ def fmt_br(valor):
 # ===== CONFIGURAÇÃO DA PÁGINA =====
 st.set_page_config(page_title="Apresentação Comercial - KAO", page_icon="🚚", layout="wide")
 
-# ===== IDENTIDADE VISUAL (DARK MODE / SLIDE POWERPOINT) =====
-BG_DARK = "#0F172A"       # Fundo estilo PowerPoint Dark
-CARD_DARK = "#1E293B"     # Cards de slide
-BORDER_DARK = "#334155"   # Bordas elegantes
-TEXT_MAIN = "#F8FAFC"     # Texto Branco
-TEXT_MUTED = "#94A3B8"    # Texto Cinza Claro
-GREEN_NEON = "#22C55E"    # Verde vibrante
-NAVY_ACCENT = "#38BDF8"   # Azul Cyan nítido
+# ===== IDENTIDADE VISUAL =====
+BG_DARK = "#0F172A"       
+CARD_DARK = "#1E293B"     
+BORDER_DARK = "#334155"   
+TEXT_MAIN = "#F8FAFC"     
+TEXT_MUTED = "#94A3B8"    
+GREEN_NEON = "#22C55E"    
+NAVY_ACCENT = "#38BDF8"   
 
 st.markdown(f"""
 <style>
 .stApp {{ background-color: {BG_DARK}; color: {TEXT_MAIN}; }}
 .block-container {{ padding-top: 1.5rem; max-width: 1350px; }}
-
 h1, h2, h3, h4, h5 {{ color: {TEXT_MAIN} !important; font-family: 'Segoe UI', Roboto, sans-serif; }}
 
 .header-slide {{
@@ -86,7 +85,7 @@ months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
 if "df_historico" not in st.session_state:
     st.session_state.df_historico = pd.DataFrame({
         "Mês": months,
-        "Meta Total": [350658.00] * 12,
+        "Meta Total": [382658.00] * 12,
         "Fat. Total": [0.0] * 12,
         "% Total": [0.0] * 12,
         "UP": [0.0] * 12,
@@ -98,9 +97,6 @@ if "clientes" not in st.session_state:
         {"CLIENTE": f"Cliente {i+1}", "RECEITA": 0.0, "MÊS ANTERIOR": 0.0, "ANO ANTERIOR": 0.0, "RENTABILIDADE": 0.0, "SLA": 0.0, "CONSIDERAÇÕES": ""}
         for i in range(5)
     ])
-
-if "faturado_auto" not in st.session_state:
-    st.session_state.faturado_auto = 0.0
 
 if "fechados" not in st.session_state:
     st.session_state.fechados = pd.DataFrame([
@@ -114,19 +110,16 @@ if "upcoming" not in st.session_state:
         for _ in range(5)
     ])
 
-# ===== SEÇÃO 0: IMPORTAÇÃO DA PLANILHA (PUXA AUTOMÁTICO) =====
+# ===== SEÇÃO DE IMPORTAÇÃO AUTOMÁTICA =====
 with st.expander("📂 Importar Dados da Planilha (.xlsx)", expanded=True):
     uploaded_file = st.file_uploader("Arraste ou selecione a planilha (ex: data (50).xlsx)", type=["xlsx"])
     if uploaded_file:
         try:
             excel_data = pd.read_excel(uploaded_file, sheet_name=None)
-            
-            # Procura a aba Export ou usa a primeira aba disponível
             sheet_target = "Export" if "Export" in excel_data else list(excel_data.keys())[0]
             df_export = excel_data[sheet_target]
             
             if "Razão Grupo" in df_export.columns and "Mês atual" in df_export.columns:
-                # Filtrar linhas válidas
                 df_valid = df_export[
                     df_export["Razão Grupo"].notna() & 
                     (~df_export["Razão Grupo"].astype(str).str.startswith("Total")) &
@@ -136,11 +129,9 @@ with st.expander("📂 Importar Dados da Planilha (.xlsx)", expanded=True):
                 df_valid["Mês atual"] = pd.to_numeric(df_valid["Mês atual"], errors='coerce').fillna(0.0)
                 df_valid["Mês anterior"] = pd.to_numeric(df_valid["Mês anterior"], errors='coerce').fillna(0.0)
 
-                # 1. PUXAR TOTAL FATURADO AUTOMATICAMENTE
                 total_faturado_calc = float(df_valid["Mês atual"].sum())
                 st.session_state.faturado_auto = total_faturado_calc
 
-                # 2. POPULAR TOP 5 CLIENTES
                 top5 = df_valid.sort_values(by="Mês atual", ascending=False).head(5)
                 novos_clientes = []
                 for idx, row in top5.iterrows():
@@ -161,7 +152,7 @@ with st.expander("📂 Importar Dados da Planilha (.xlsx)", expanded=True):
                     })
 
                 st.session_state.clientes = pd.DataFrame(novos_clientes)
-                st.success(f"✅ Sucesso! Faturado total de R$ {fmt_br(total_faturado_calc)} importado automaticamente!")
+                st.success(f"✅ Sucesso! Faturado total de R$ {fmt_br(total_faturado_calc)} importado!")
         except Exception as e:
             st.error(f"Erro ao ler arquivo: {e}")
 
@@ -172,29 +163,20 @@ c1, c2, c3 = st.columns([2, 1, 1])
 with c1:
     nome = st.text_input("NOME DO EXECUTIVO / KAM", value="Cleyton Kauffmann")
 with c2:
-    mes = st.selectbox("MÊS DE REFERÊNCIA", months, index=7) # Agosto
+    mes = st.selectbox("MÊS DE REFERÊNCIA", months, index=7)
 with c3:
     data_ref = st.date_input("DATA DE APRESENTAÇÃO")
 st.markdown('</div>', unsafe_allow_html=True)
 
-# ===== SEÇÃO 2: META | FATURAMENTO (MÊS ATUAL) =====
+# ===== SEÇÃO 2: META | FATURAMENTO =====
 st.markdown('<div class="section-card">', unsafe_allow_html=True)
 st.subheader("2. META | FATURAMENTO — MÊS ATUAL")
 
 col_meta, col_fat, col_proj = st.columns(3)
-
 with col_meta:
-    meta = st.number_input("📌 META DA GERÊNCIA (R$)", min_value=0.0, value=350658.00, step=1000.0)
-
+    meta = st.number_input("📌 META DA GERÊNCIA (R$)", min_value=0.0, value=382658.00, step=1000.0)
 with col_fat:
-    # Recebe o valor automático da planilha
-    faturado = st.number_input(
-        "💰 FATURADO ALCANÇADO (R$)", 
-        min_value=0.0, 
-        value=float(st.session_state.get("faturado_auto", 0.0)), 
-        step=1000.0
-    )
-
+    faturado = st.number_input("💰 FATURADO ALCANÇADO (R$)", min_value=0.0, value=float(st.session_state.get("faturado_auto", 88873.92)), step=1000.0)
 with col_proj:
     projecao = st.number_input("📈 PROJEÇÃO MÊS (R$)", min_value=0.0, value=faturado, step=1000.0)
 
@@ -205,9 +187,7 @@ delta_pct = pct_realizado - 100
 
 st.divider()
 
-# ===== METRICAS VISUAIS =====
 m1, m2, m3 = st.columns(3)
-
 cor_bola_bg = "linear-gradient(135deg, #166534 0%, #22C55E 100%)" if pct_realizado >= 100 else "linear-gradient(135deg, #991B1B 0%, #EF4444 100%)"
 cor_badge_bg = "#14532D" if delta_pct >= 0 else "#7F1D1D"
 cor_badge_txt = "#4ADE80" if delta_pct >= 0 else "#FCA5A5"
@@ -215,28 +195,11 @@ cor_badge_txt = "#4ADE80" if delta_pct >= 0 else "#FCA5A5"
 with m1:
     st.markdown(f"""
     <div style="text-align: center; background: #0F172A; padding: 20px; border-radius: 14px; border: 1px solid {BORDER_DARK};">
-        <span style="font-size: 0.85rem; font-weight: 700; color: {TEXT_MUTED}; letter-spacing: 0.5px; text-transform: uppercase;">% ALCANÇADO (META x FAT)</span>
-        <div style="
-            width: 120px; 
-            height: 120px; 
-            background: {cor_bola_bg}; 
-            border-radius: 50%; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            margin: 15px auto; 
-            box-shadow: 0 0 20px rgba(34, 197, 94, 0.4);
-        ">
+        <span style="font-size: 0.85rem; font-weight: 700; color: {TEXT_MUTED}; text-transform: uppercase;">% ALCANÇADO (META x FAT)</span>
+        <div style="width: 120px; height: 120px; background: {cor_bola_bg}; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 15px auto;">
             <span style="color: #FFFFFF; font-size: 1.6rem; font-weight: 800;">{pct_realizado:.1f}%</span>
         </div>
-        <span style="
-            background-color: {cor_badge_bg}; 
-            color: {cor_badge_txt}; 
-            padding: 6px 14px; 
-            border-radius: 20px; 
-            font-size: 0.85rem; 
-            font-weight: 700;
-        ">
+        <span style="background-color: {cor_badge_bg}; color: {cor_badge_txt}; padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; font-weight: 700;">
             {"↑" if delta_pct >= 0 else "↓"} {delta_pct:+.1f}% vs Meta
         </span>
     </div>
@@ -245,18 +208,8 @@ with m1:
 with m2:
     st.markdown(f"""
     <div style="text-align: center; background: #0F172A; padding: 20px; border-radius: 14px; border: 1px solid {BORDER_DARK};">
-        <span style="font-size: 0.85rem; font-weight: 700; color: {TEXT_MUTED}; letter-spacing: 0.5px; text-transform: uppercase;">PROJEÇÃO DA META %</span>
-        <div style="
-            width: 120px; 
-            height: 120px; 
-            background: linear-gradient(135deg, #0369A1 0%, #38BDF8 100%); 
-            border-radius: 50%; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            margin: 15px auto; 
-            box-shadow: 0 0 20px rgba(56, 189, 248, 0.3);
-        ">
+        <span style="font-size: 0.85rem; font-weight: 700; color: {TEXT_MUTED}; text-transform: uppercase;">PROJEÇÃO DA META %</span>
+        <div style="width: 120px; height: 120px; background: linear-gradient(135deg, #0369A1 0%, #38BDF8 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 15px auto;">
             <span style="color: #FFFFFF; font-size: 1.6rem; font-weight: 800;">{pct_projecao:.1f}%</span>
         </div>
         <span style="color: {TEXT_MUTED}; font-size: 0.85rem; font-weight: 600;">Projeção de Fechamento</span>
@@ -267,18 +220,11 @@ with m3:
     cor_gap = "#4ADE80" if gap_projecao >= 0 else "#FCA5A5"
     st.markdown(f"""
     <div style="text-align: center; background: #0F172A; padding: 20px; border-radius: 14px; border: 1px solid {BORDER_DARK};">
-        <span style="font-size: 0.85rem; font-weight: 700; color: {TEXT_MUTED}; letter-spacing: 0.5px; text-transform: uppercase;">GAP (PROJEÇÃO x META)</span>
+        <span style="font-size: 0.85rem; font-weight: 700; color: {TEXT_MUTED}; text-transform: uppercase;">GAP (PROJEÇÃO x META)</span>
         <div style="height: 120px; display: flex; align-items: center; justify-content: center; margin: 15px auto;">
             <span style="color: #FFFFFF; font-size: 2.0rem; font-weight: 800;">R$ {fmt_br(gap_projecao)}</span>
         </div>
-        <span style="
-            background-color: {cor_badge_bg}; 
-            color: {cor_gap}; 
-            padding: 6px 14px; 
-            border-radius: 20px; 
-            font-size: 0.85rem; 
-            font-weight: 700;
-        ">
+        <span style="background-color: {cor_badge_bg}; color: {cor_gap}; padding: 6px 14px; border-radius: 20px; font-size: 0.85rem; font-weight: 700;">
             {"↑" if gap_projecao >= 0 else "↓"} R$ {fmt_br(gap_projecao)}
         </span>
     </div>
@@ -286,15 +232,13 @@ with m3:
 
 st.markdown('</div>', unsafe_allow_html=True)
 
-# ===== SEÇÃO 3: EVOLUÇÃO HISTÓRICA & GRÁFICO =====
+# ===== SEÇÃO 3: EVOLUÇÃO HISTÓRICA =====
 st.markdown('<div class="section-card">', unsafe_allow_html=True)
 st.subheader("3. META | FATURAMENTO — EVOLUÇÃO HISTÓRICA")
 
-# Atualizar o mês correspondente no histórico automaticamente se desejar
 idx_mes = months.index(mes)
 st.session_state.df_historico.loc[idx_mes, "Fat. Total"] = faturado
 
-# Cálculo automático
 df_calc = st.session_state.df_historico.copy()
 df_calc["% Total"] = np.where(df_calc["Meta Total"] > 0, (df_calc["Fat. Total"] / df_calc["Meta Total"]) * 100, 0.0)
 df_calc["UP"] = np.maximum(df_calc["Fat. Total"] - df_calc["Meta Total"], 0)
@@ -313,41 +257,29 @@ st.session_state.df_historico = st.data_editor(
         "UP": st.column_config.NumberColumn("UP (R$)", format="R$ %,.2f", disabled=True),
         "LOSS": st.column_config.NumberColumn("LOSS (R$)", format="R$ %,.2f", disabled=True),
     },
-    key="editor_historico_auto"
+    key="editor_historico_full"
 )
 
-st.markdown("#### Evolução Mensal (Gráfico Nítido Dark Mode)")
-
+# Gráfico
 fig = go.Figure()
 fig.add_trace(go.Bar(
     x=st.session_state.df_historico["Mês"],
     y=st.session_state.df_historico["Fat. Total"],
     name="Faturado Alcançado",
     marker_color=GREEN_NEON,
-    width=0.35,
-    hovertemplate="Mês: %{x}<br>Alcançado: R$ %{y:,.2f}<extra></extra>"
+    width=0.35
 ))
-
 fig.add_trace(go.Scatter(
     x=st.session_state.df_historico["Mês"],
     y=st.session_state.df_historico["Fat. Total"],
-    name="Tendência Faturado",
+    name="Tendência",
     mode="lines+markers",
-    line=dict(color=NAVY_ACCENT, dash="dash", width=3),
-    marker=dict(size=8, color=NAVY_ACCENT),
-    hovertemplate="Mês: %{x}<br>Tendência: R$ %{y:,.2f}<extra></extra>"
+    line=dict(color=NAVY_ACCENT, dash="dash", width=3)
 ))
-
 fig.update_layout(
-    paper_bgcolor="rgba(0,0,0,0)",
-    plot_bgcolor="#0F172A",
-    font=dict(color="#F8FAFC", family="Segoe UI"),
-    xaxis=dict(categoryorder="array", categoryarray=months, gridcolor="#334155"),
-    yaxis=dict(title="Valor (R$)", tickprefix="R$ ", gridcolor="#334155"),
-    legend=dict(orientation="h", y=1.02, x=1),
-    margin=dict(l=20, r=20, t=40, b=20)
+    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#0F172A",
+    font=dict(color="#F8FAFC"), margin=dict(l=20, r=20, t=20, b=20)
 )
-
 st.plotly_chart(fig, use_container_width=True)
 st.markdown('</div>', unsafe_allow_html=True)
 
@@ -360,7 +292,7 @@ st.session_state.clientes = st.data_editor(
     num_rows="fixed",
     use_container_width=True,
     hide_index=True,
-    key="editor_clientes_auto",
+    key="editor_clientes_full",
     column_config={
         "RECEITA": st.column_config.NumberColumn("RECEITA (R$)", format="R$ %,.2f"),
         "MÊS ANTERIOR": st.column_config.NumberColumn("MÊS ANTERIOR (R$)", format="R$ %,.2f"),
@@ -370,13 +302,65 @@ st.session_state.clientes = st.data_editor(
         "CONSIDERAÇÕES": st.column_config.TextColumn("CONSIDERAÇÕES / OBS")
     }
 )
+st.markdown('</div>', unsafe_allow_html=True)
 
-df_valid_cli = st.session_state.clientes[st.session_state.clientes["CLIENTE"].astype(str).str.strip() != ""]
-tot_top5 = df_valid_cli["RECEITA"].sum()
+# ===== SEÇÃO 5: NOVOS CLIENTES FECHADOS =====
+st.markdown('<div class="section-card">', unsafe_allow_html=True)
+st.subheader("5. NOVOS CLIENTES FECHADOS NO MÊS")
 
-c_tot1, c_tot2 = st.columns(2)
-with c_tot1:
-    st.metric("TOTAL TOP 5 CLIENTES", f"R$ {fmt_br(tot_top5)}")
-with c_tot2:
-    st.metric("TOTAL CARTEIRA GERAL", f"R$ {fmt_br(faturado)}")
+st.session_state.fechados = st.data_editor(
+    st.session_state.fechados,
+    num_rows="dynamic",
+    use_container_width=True,
+    hide_index=True,
+    key="editor_fechados",
+    column_config={
+        "PROJEÇÃO MÊS": st.column_config.NumberColumn("PROJEÇÃO (R$)", format="R$ %,.2f"),
+        "FATURADO MÊS": st.column_config.NumberColumn("FATURADO (R$)", format="R$ %,.2f"),
+    }
+)
+st.markdown('</div>', unsafe_allow_html=True)
+
+# ===== SEÇÃO 6: PRÓXIMOS FECHAMENTOS (PIPELINE) =====
+st.markdown('<div class="section-card">', unsafe_allow_html=True)
+st.subheader("6. PRÓXIMOS FECHAMENTOS (PIPELINE / UPCOMING)")
+
+st.session_state.upcoming = st.data_editor(
+    st.session_state.upcoming,
+    num_rows="dynamic",
+    use_container_width=True,
+    hide_index=True,
+    key="editor_upcoming",
+    column_config={
+        "PROJEÇÃO MÊS": st.column_config.NumberColumn("PROJEÇÃO (R$)", format="R$ %,.2f"),
+    }
+)
+st.markdown('</div>', unsafe_allow_html=True)
+
+# ===== SEÇÃO 7: DADOS CONSOLIDADOS & EXPORTAÇÃO =====
+st.markdown('<div class="section-card">', unsafe_allow_html=True)
+st.subheader("7. Exportação e Resumo Final")
+
+c_exp1, c_exp2 = st.columns(2)
+
+with c_exp1:
+    # Gerar Excel Consolidado
+    buffer_excel = BytesIO()
+    with pd.ExcelWriter(buffer_excel, engine="xlsxwriter") as writer:
+        st.session_state.df_historico.to_excel(writer, sheet_name="Historico", index=False)
+        st.session_state.clientes.to_excel(writer, sheet_name="Top 5 Clientes", index=False)
+        st.session_state.fechados.to_excel(writer, sheet_name="Fechados", index=False)
+        st.session_state.upcoming.to_excel(writer, sheet_name="Pipeline", index=False)
+    
+    st.download_button(
+        label="📊 Baixar Relatório em Excel",
+        data=buffer_excel.getvalue(),
+        file_name=f"Relatorio_Comercial_{mes}_{nome.replace(' ', '_')}.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True
+    )
+
+with c_exp2:
+    st.button("📥 Exportar para PPTX (PowerPoint)", use_container_width=True, help="Funcionalidade em desenvolvimento")
+
 st.markdown('</div>', unsafe_allow_html=True)
