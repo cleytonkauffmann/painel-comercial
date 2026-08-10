@@ -242,47 +242,27 @@ st.subheader("3. META | FATURAMENTO — EVOLUÇÃO HISTÓRICA")
 idx_mes = months.index(mes)
 st.session_state.df_historico.loc[idx_mes, "Fat. Total"] = faturado
 
-# Recalcular métricas
+# Recalcular métricas automaticamente
 df_calc = st.session_state.df_historico.copy()
 df_calc["% Total"] = np.where(df_calc["Meta Total"] > 0, (df_calc["Fat. Total"] / df_calc["Meta Total"]) * 100, 0.0)
 df_calc["UP"] = np.maximum(df_calc["Fat. Total"] - df_calc["Meta Total"], 0)
 df_calc["LOSS"] = np.maximum(df_calc["Meta Total"] - df_calc["Fat. Total"], 0)
 st.session_state.df_historico = df_calc
 
-# Função para formatação condicional de cor
-def colorir_atingido(val):
-    if val >= 100.0:
-        return "color: #22C55E; font-weight: bold; background-color: rgba(34, 197, 94, 0.15);" # Verde
-    elif val > 0:
-        return "color: #EF4444; font-weight: bold; background-color: rgba(239, 68, 68, 0.15);"  # Vermelho
-    return "color: #94A3B8;" # Cinza quando zerado
-
-# Aplicação do Styler na tabela
-try:
-    df_estilizado = st.session_state.df_historico.style.map(
-        colorir_atingido, subset=["% Total"]
-    ).format({
-        "Meta Total": "R$ {:,.2f}",
-        "Fat. Total": "R$ {:,.2f}",
-        "% Total": "{:.1f}%",
-        "UP": "R$ {:,.2f}",
-        "LOSS": "R$ {:,.2f}"
-    })
-except AttributeError:
-    df_estilizado = st.session_state.df_historico.style.applymap(
-        colorir_atingido, subset=["% Total"]
-    ).format({
-        "Meta Total": "R$ {:,.2f}",
-        "Fat. Total": "R$ {:,.2f}",
-        "% Total": "{:.1f}%",
-        "UP": "R$ {:,.2f}",
-        "LOSS": "R$ {:,.2f}"
-    })
-
-st.dataframe(
-    df_estilizado,
+# Tabela EDITÁVEL
+st.session_state.df_historico = st.data_editor(
+    st.session_state.df_historico,
     use_container_width=True,
-    hide_index=True
+    hide_index=True,
+    key="editor_historico_v4",
+    column_config={
+        "Mês": st.column_config.TextColumn("Mês", disabled=True),
+        "Meta Total": st.column_config.NumberColumn("Meta Total (R$)", format="R$ %,.2f"),
+        "Fat. Total": st.column_config.NumberColumn("Fat. Total (R$)", format="R$ %,.2f"),
+        "% Total": st.column_config.NumberColumn("% Atingido", format="%.1f%%", disabled=True),
+        "UP": st.column_config.NumberColumn("UP (R$)", format="R$ %,.2f", disabled=True),
+        "LOSS": st.column_config.NumberColumn("LOSS (R$)", format="R$ %,.2f", disabled=True),
+    }
 )
 
 # Gráfico da evolução
