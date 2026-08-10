@@ -16,7 +16,7 @@ def fmt_br(valor):
 # ===== Configuração da Página =====
 st.set_page_config(page_title="Apresentação Comercial - KAO", page_icon="🚚", layout="wide")
 
-# ===== Identidade visual (Alinhada aos slides) =====
+# ===== Identidade Visual (Alinhada aos Slides KAO) =====
 NAVY = "#102A43"
 GREEN = "#1E8449"
 BLUE = "#1F5A94"
@@ -65,6 +65,19 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ===== Estado da Sessão (Session State) =====
+months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", 
+          "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+
+if "df_historico" not in st.session_state:
+    st.session_state.df_historico = pd.DataFrame({
+        "Mês": months,
+        "Meta Total": [350658.00] * 12,
+        "Fat. Total": [0.0] * 12,
+        "% Total": [0.0] * 12,
+        "UP": [0.0] * 12,
+        "LOSS": [0.0] * 12
+    })
+
 if "clientes" not in st.session_state:
     st.session_state.clientes = pd.DataFrame([
         {"CLIENTE": f"Cliente {i+1}", "RECEITA": 0.0, "MÊS ANTERIOR": 0.0, "ANO ANTERIOR": 0.0, "RENTABILIDADE": 0.0, "SLA": 0.0, "CONSIDERAÇÕES": ""}
@@ -83,9 +96,9 @@ if "upcoming" not in st.session_state:
         for _ in range(5)
     ])
 
-# ===== SEÇÃO 0: IMPORTAÇÃO DE DADOS (OPCIONAL) =====
+# ===== SEÇÃO 0: IMPORTAÇÃO DE DADOS =====
 with st.expander("📂 Importar Dados de Planilha Excel (Carga Rápida)", expanded=False):
-    uploaded_file = st.file_uploader("Arraste ou selecione a planilha de metas/histórico (.xlsx)", type=["xlsx"])
+    uploaded_file = st.file_uploader("Arraste ou selecione a planilha (.xlsx)", type=["xlsx"])
     if uploaded_file:
         try:
             excel_data = pd.read_excel(uploaded_file, sheet_name=None)
@@ -93,7 +106,7 @@ with st.expander("📂 Importar Dados de Planilha Excel (Carga Rápida)", expand
             if "Export" in excel_data:
                 st.session_state["df_export_imported"] = excel_data["Export"]
             elif "Historico" in excel_data:
-                st.session_state["df_hist_imported"] = excel_data["Historico"]
+                st.session_state.df_historico = excel_data["Historico"]
         except Exception as e:
             st.error(f"Erro ao ler arquivo: {e}")
 
@@ -104,10 +117,7 @@ c1, c2, c3 = st.columns([2, 1, 1])
 with c1:
     nome = st.text_input("NOME DO EXECUTIVO / KAM", value="Cleyton Kauffmann")
 with c2:
-    mes = st.selectbox("MÊS DE REFERÊNCIA", [
-        "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-        "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
-    ], index=4)
+    mes = st.selectbox("MÊS DE REFERÊNCIA", months, index=4)
 with c3:
     data_ref = st.date_input("DATA DE APRESENTAÇÃO")
 st.markdown('</div>', unsafe_allow_html=True)
@@ -128,7 +138,7 @@ with col_fat:
 with col_proj:
     projecao = st.number_input("📈 PROJEÇÃO MÊS (R$)", min_value=0.0, value=faturado, step=1000.0)
 
-# CÁLCULOS
+# Cálculos da Seção Meta
 pct_realizado = (faturado / meta * 100) if meta > 0 else 0.0
 pct_projecao = (projecao / meta * 100) if meta > 0 else 0.0
 gap_projecao = projecao - meta
@@ -155,26 +165,56 @@ with m3:
     )
 st.markdown('</div>', unsafe_allow_html=True)
 
-# ===== SEÇÃO 3: EVOLUÇÃO HISTÓRICA =====
+# ===== SEÇÃO 3: EVOLUÇÃO HISTÓRICA (COM PREENCHIMENTO AUTOMÁTICO) =====
 st.markdown('<div class="section-card">', unsafe_allow_html=True)
 st.subheader("3. META | FATURAMENTO — EVOLUÇÃO HISTÓRICA")
 
-months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+st.markdown("##### ⚡ Ações Rápidas de Preenchimento")
 
-if "df_hist_imported" in st.session_state:
-    hist_base = st.session_state["df_hist_imported"]
-else:
-    hist_base = pd.DataFrame({
-        "Mês": months,
-        "Meta Total": [350658.00] * 12,
-        "Fat. Total": [0.0] * 12,
-        "% Total": [0.0] * 12,
-        "UP": [0.0] * 12,
-        "LOSS": [0.0] * 12
-    })
+c_auto1, c_auto2, c_auto3 = st.columns([2, 2, 2])
 
-edited_hist = st.data_editor(
-    hist_base,
+with c_auto1:
+    valor_meta_replicar = st.number_input(
+        "Replicar Meta Mensal (R$)", 
+        value=float(meta), 
+        step=1000.0,
+        key="input_meta_rep"
+    )
+    if st.button("🔄 Aplicar Meta para Todos os Meses", use_container_width=True):
+        st.session_state.df_historico["Meta Total"] = valor_meta_replicar
+        st.success("Meta replicada para todos os meses!")
+        st.rerun()
+
+with c_auto2:
+    mes_lançamento = st.selectbox("Lançar Faturado no Mês", months, key="sel_mes_lanc")
+    valor_fat_lanc = st.number_input("Valor Faturado (R$)", min_value=0.0, step=1000.0, key="input_fat_lanc")
+    if st.button("💾 Salvar Faturamento do Mês", use_container_width=True):
+        idx = st.session_state.df_historico[st.session_state.df_historico["Mês"] == mes_lançamento].index
+        if len(idx) > 0:
+            st.session_state.df_historico.loc[idx[0], "Fat. Total"] = valor_fat_lanc
+            st.success(f"Faturado de {mes_lançamento} atualizado para R$ {fmt_br(valor_fat_lanc)}!")
+            st.rerun()
+
+with c_auto3:
+    st.write("")
+    st.write("")
+    if st.button("🧹 Zerar Faturamentos do Ano", use_container_width=True):
+        st.session_state.df_historico["Fat. Total"] = 0.0
+        st.rerun()
+
+st.divider()
+
+# Cálculos Automáticos de UP, LOSS e %
+df_calc = st.session_state.df_historico.copy()
+df_calc["% Total"] = np.where(df_calc["Meta Total"] > 0, (df_calc["Fat. Total"] / df_calc["Meta Total"]) * 100, 0.0)
+df_calc["UP"] = np.maximum(df_calc["Fat. Total"] - df_calc["Meta Total"], 0)
+df_calc["LOSS"] = np.maximum(df_calc["Meta Total"] - df_calc["Fat. Total"], 0)
+st.session_state.df_historico = df_calc
+
+st.markdown("##### 📋 Tabela de Evolução Consolidada")
+
+st.session_state.df_historico = st.data_editor(
+    st.session_state.df_historico,
     use_container_width=True,
     hide_index=True,
     column_config={
@@ -185,17 +225,11 @@ edited_hist = st.data_editor(
         "UP": st.column_config.NumberColumn("UP (R$)", format="R$ %,.2f", disabled=True),
         "LOSS": st.column_config.NumberColumn("LOSS (R$)", format="R$ %,.2f", disabled=True),
     },
-    key="editor_historico"
+    key="editor_historico_v3"
 )
 
-# Recálculo automático de UP / LOSS e % Total
-calc_hist = edited_hist.copy()
-calc_hist["% Total"] = np.where(calc_hist["Meta Total"] > 0, (calc_hist["Fat. Total"] / calc_hist["Meta Total"]) * 100, 0.0)
-calc_hist["UP"] = np.maximum(calc_hist["Fat. Total"] - calc_hist["Meta Total"], 0)
-calc_hist["LOSS"] = np.maximum(calc_hist["Meta Total"] - calc_hist["Fat. Total"], 0)
-
 st.markdown("#### Evolução Mensal (Meta vs Faturado)")
-st.line_chart(calc_hist.set_index("Mês")[["Meta Total", "Fat. Total"]], color=[BLUE, GREEN])
+st.line_chart(st.session_state.df_historico.set_index("Mês")[["Meta Total", "Fat. Total"]], color=[BLUE, GREEN])
 st.markdown('</div>', unsafe_allow_html=True)
 
 # ===== SEÇÃO 4: PRINCIPAIS CLIENTES =====
@@ -274,7 +308,7 @@ with col_exp1:
                 "% Alcançado": f"{pct_realizado:.1f}%".replace(".", ","), "Projeção": fmt_br(projecao)
             }]).to_excel(writer, sheet_name="Resumo_Executivo", index=False)
             
-            calc_hist_fmt = calc_hist.copy()
+            calc_hist_fmt = st.session_state.df_historico.copy()
             for col in ["Meta Total", "Fat. Total", "UP", "LOSS"]:
                 calc_hist_fmt[col] = calc_hist_fmt[col].apply(fmt_br)
             calc_hist_fmt.to_excel(writer, sheet_name="Historico", index=False)
