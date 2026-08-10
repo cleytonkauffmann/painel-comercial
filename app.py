@@ -2,9 +2,6 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from io import BytesIO
-from pptx import Presentation
-from pptx.util import Inches, Pt
-from pptx.dml.color import RGBColor
 import plotly.graph_objects as go
 
 # ===== FUNÇÃO DE FORMATAÇÃO BRASILEIRA =====
@@ -78,7 +75,7 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# ===== ESTADO DA SESSÃO =====
+# ===== ESTADO DA SESSÃO (INICIALIZAÇÃO) =====
 months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", 
           "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
 
@@ -110,7 +107,10 @@ if "upcoming" not in st.session_state:
         for _ in range(5)
     ])
 
-# ===== SEÇÃO DE IMPORTAÇÃO AUTOMÁTICA =====
+if "faturado_auto" not in st.session_state:
+    st.session_state.faturado_auto = 88873.92
+
+# ===== IMPORTAÇÃO DA PLANILHA =====
 with st.expander("📂 Importar Dados da Planilha (.xlsx)", expanded=True):
     uploaded_file = st.file_uploader("Arraste ou selecione a planilha (ex: data (50).xlsx)", type=["xlsx"])
     if uploaded_file:
@@ -130,29 +130,32 @@ with st.expander("📂 Importar Dados da Planilha (.xlsx)", expanded=True):
                 df_valid["Mês anterior"] = pd.to_numeric(df_valid["Mês anterior"], errors='coerce').fillna(0.0)
 
                 total_faturado_calc = float(df_valid["Mês atual"].sum())
-                st.session_state.faturado_auto = total_faturado_calc
+                
+                if st.session_state.faturado_auto != total_faturado_calc:
+                    st.session_state.faturado_auto = total_faturado_calc
 
-                top5 = df_valid.sort_values(by="Mês atual", ascending=False).head(5)
-                novos_clientes = []
-                for idx, row in top5.iterrows():
-                    novos_clientes.append({
-                        "CLIENTE": str(row["Razão Grupo"]),
-                        "RECEITA": float(row["Mês atual"]),
-                        "MÊS ANTERIOR": float(row["Mês anterior"]),
-                        "ANO ANTERIOR": 0.0,
-                        "RENTABILIDADE": 0.0,
-                        "SLA": 0.0,
-                        "CONSIDERAÇÕES": ""
-                    })
+                    top5 = df_valid.sort_values(by="Mês atual", ascending=False).head(5)
+                    novos_clientes = []
+                    for idx, row in top5.iterrows():
+                        novos_clientes.append({
+                            "CLIENTE": str(row["Razão Grupo"]),
+                            "RECEITA": float(row["Mês atual"]),
+                            "MÊS ANTERIOR": float(row["Mês anterior"]),
+                            "ANO ANTERIOR": 0.0,
+                            "RENTABILIDADE": 0.0,
+                            "SLA": 0.0,
+                            "CONSIDERAÇÕES": ""
+                        })
 
-                while len(novos_clientes) < 5:
-                    novos_clientes.append({
-                        "CLIENTE": "", "RECEITA": 0.0, "MÊS ANTERIOR": 0.0,
-                        "ANO ANTERIOR": 0.0, "RENTABILIDADE": 0.0, "SLA": 0.0, "CONSIDERAÇÕES": ""
-                    })
+                    while len(novos_clientes) < 5:
+                        novos_clientes.append({
+                            "CLIENTE": "", "RECEITA": 0.0, "MÊS ANTERIOR": 0.0,
+                            "ANO ANTERIOR": 0.0, "RENTABILIDADE": 0.0, "SLA": 0.0, "CONSIDERAÇÕES": ""
+                        })
 
-                st.session_state.clientes = pd.DataFrame(novos_clientes)
-                st.success(f"✅ Sucesso! Faturado total de R$ {fmt_br(total_faturado_calc)} importado!")
+                    st.session_state.clientes = pd.DataFrame(novos_clientes)
+                    st.success(f"✅ Sucesso! Faturado total de R$ {fmt_br(total_faturado_calc)} importado!")
+                    st.rerun()
         except Exception as e:
             st.error(f"Erro ao ler arquivo: {e}")
 
@@ -176,7 +179,7 @@ col_meta, col_fat, col_proj = st.columns(3)
 with col_meta:
     meta = st.number_input("📌 META DA GERÊNCIA (R$)", min_value=0.0, value=382658.00, step=1000.0)
 with col_fat:
-    faturado = st.number_input("💰 FATURADO ALCANÇADO (R$)", min_value=0.0, value=float(st.session_state.get("faturado_auto", 88873.92)), step=1000.0)
+    faturado = st.number_input("💰 FATURADO ALCANÇADO (R$)", min_value=0.0, value=float(st.session_state.faturado_auto), step=1000.0)
 with col_proj:
     projecao = st.number_input("📈 PROJEÇÃO MÊS (R$)", min_value=0.0, value=faturado, step=1000.0)
 
@@ -239,28 +242,50 @@ st.subheader("3. META | FATURAMENTO — EVOLUÇÃO HISTÓRICA")
 idx_mes = months.index(mes)
 st.session_state.df_historico.loc[idx_mes, "Fat. Total"] = faturado
 
+# Recalcular métricas
 df_calc = st.session_state.df_historico.copy()
 df_calc["% Total"] = np.where(df_calc["Meta Total"] > 0, (df_calc["Fat. Total"] / df_calc["Meta Total"]) * 100, 0.0)
 df_calc["UP"] = np.maximum(df_calc["Fat. Total"] - df_calc["Meta Total"], 0)
 df_calc["LOSS"] = np.maximum(df_calc["Meta Total"] - df_calc["Fat. Total"], 0)
 st.session_state.df_historico = df_calc
 
-st.session_state.df_historico = st.data_editor(
-    st.session_state.df_historico,
+# Função para formatação condicional de cor
+def colorir_atingido(val):
+    if val >= 100.0:
+        return "color: #22C55E; font-weight: bold; background-color: rgba(34, 197, 94, 0.15);" # Verde
+    elif val > 0:
+        return "color: #EF4444; font-weight: bold; background-color: rgba(239, 68, 68, 0.15);"  # Vermelho
+    return "color: #94A3B8;" # Cinza quando zerado
+
+# Aplicação do Styler na tabela
+try:
+    df_estilizado = st.session_state.df_historico.style.map(
+        colorir_atingido, subset=["% Total"]
+    ).format({
+        "Meta Total": "R$ {:,.2f}",
+        "Fat. Total": "R$ {:,.2f}",
+        "% Total": "{:.1f}%",
+        "UP": "R$ {:,.2f}",
+        "LOSS": "R$ {:,.2f}"
+    })
+except AttributeError:
+    df_estilizado = st.session_state.df_historico.style.applymap(
+        colorir_atingido, subset=["% Total"]
+    ).format({
+        "Meta Total": "R$ {:,.2f}",
+        "Fat. Total": "R$ {:,.2f}",
+        "% Total": "{:.1f}%",
+        "UP": "R$ {:,.2f}",
+        "LOSS": "R$ {:,.2f}"
+    })
+
+st.dataframe(
+    df_estilizado,
     use_container_width=True,
-    hide_index=True,
-    column_config={
-        "Mês": st.column_config.TextColumn(disabled=True),
-        "Meta Total": st.column_config.NumberColumn("Meta Total (R$)", format="R$ %,.2f"),
-        "Fat. Total": st.column_config.NumberColumn("Fat. Total (R$)", format="R$ %,.2f"),
-        "% Total": st.column_config.NumberColumn("% Atingido", format="%.1f%%", disabled=True),
-        "UP": st.column_config.NumberColumn("UP (R$)", format="R$ %,.2f", disabled=True),
-        "LOSS": st.column_config.NumberColumn("LOSS (R$)", format="R$ %,.2f", disabled=True),
-    },
-    key="editor_historico_full"
+    hide_index=True
 )
 
-# Gráfico
+# Gráfico da evolução
 fig = go.Figure()
 fig.add_trace(go.Bar(
     x=st.session_state.df_historico["Mês"],
@@ -292,7 +317,7 @@ st.session_state.clientes = st.data_editor(
     num_rows="fixed",
     use_container_width=True,
     hide_index=True,
-    key="editor_clientes_full",
+    key="editor_clientes_v2",
     column_config={
         "RECEITA": st.column_config.NumberColumn("RECEITA (R$)", format="R$ %,.2f"),
         "MÊS ANTERIOR": st.column_config.NumberColumn("MÊS ANTERIOR (R$)", format="R$ %,.2f"),
@@ -313,7 +338,7 @@ st.session_state.fechados = st.data_editor(
     num_rows="dynamic",
     use_container_width=True,
     hide_index=True,
-    key="editor_fechados",
+    key="editor_fechados_v2",
     column_config={
         "PROJEÇÃO MÊS": st.column_config.NumberColumn("PROJEÇÃO (R$)", format="R$ %,.2f"),
         "FATURADO MÊS": st.column_config.NumberColumn("FATURADO (R$)", format="R$ %,.2f"),
@@ -330,37 +355,30 @@ st.session_state.upcoming = st.data_editor(
     num_rows="dynamic",
     use_container_width=True,
     hide_index=True,
-    key="editor_upcoming",
+    key="editor_upcoming_v2",
     column_config={
         "PROJEÇÃO MÊS": st.column_config.NumberColumn("PROJEÇÃO (R$)", format="R$ %,.2f"),
     }
 )
 st.markdown('</div>', unsafe_allow_html=True)
 
-# ===== SEÇÃO 7: DADOS CONSOLIDADOS & EXPORTAÇÃO =====
+# ===== SEÇÃO 7: EXPORTAÇÃO =====
 st.markdown('<div class="section-card">', unsafe_allow_html=True)
-st.subheader("7. Exportação e Resumo Final")
+st.subheader("7. Exportação dos Dados")
 
-c_exp1, c_exp2 = st.columns(2)
+buffer_excel = BytesIO()
+with pd.ExcelWriter(buffer_excel, engine="xlsxwriter") as writer:
+    st.session_state.df_historico.to_excel(writer, sheet_name="Historico", index=False)
+    st.session_state.clientes.to_excel(writer, sheet_name="Top 5 Clientes", index=False)
+    st.session_state.fechados.to_excel(writer, sheet_name="Fechados", index=False)
+    st.session_state.upcoming.to_excel(writer, sheet_name="Pipeline", index=False)
 
-with c_exp1:
-    # Gerar Excel Consolidado
-    buffer_excel = BytesIO()
-    with pd.ExcelWriter(buffer_excel, engine="xlsxwriter") as writer:
-        st.session_state.df_historico.to_excel(writer, sheet_name="Historico", index=False)
-        st.session_state.clientes.to_excel(writer, sheet_name="Top 5 Clientes", index=False)
-        st.session_state.fechados.to_excel(writer, sheet_name="Fechados", index=False)
-        st.session_state.upcoming.to_excel(writer, sheet_name="Pipeline", index=False)
-    
-    st.download_button(
-        label="📊 Baixar Relatório em Excel",
-        data=buffer_excel.getvalue(),
-        file_name=f"Relatorio_Comercial_{mes}_{nome.replace(' ', '_')}.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        use_container_width=True
-    )
-
-with c_exp2:
-    st.button("📥 Exportar para PPTX (PowerPoint)", use_container_width=True, help="Funcionalidade em desenvolvimento")
+st.download_button(
+    label="📊 Baixar Relatório Consolidado em Excel",
+    data=buffer_excel.getvalue(),
+    file_name=f"Relatorio_Comercial_{mes}_{nome.replace(' ', '_')}.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    use_container_width=True
+)
 
 st.markdown('</div>', unsafe_allow_html=True)
