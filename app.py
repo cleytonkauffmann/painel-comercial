@@ -25,11 +25,21 @@ NAVY_ACCENT = "#38BDF8"
 
 st.markdown(f"""
 <style>
+/* Importação e definição da fonte Amasis MT Pro / Serif Elegante */
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&display=swap');
+
 .stApp {{ background-color: {BG_DARK}; color: {TEXT_MAIN}; }}
 .block-container {{ padding-top: 1.5rem; max-width: 1350px; }}
-h1, h2, h3, h4, h5 {{ color: {TEXT_MAIN} !important; font-family: 'Segoe UI', Roboto, sans-serif; }}
+h1, h2, h3, h4, h5 {{ color: {TEXT_MAIN} !important; font-family: 'Amasis MT Pro', 'Georgia', serif; }}
 
-/* Cabeçalho principal */
+/* Fonte Personalizada Executiva */
+.executive-font {{
+    font-family: 'Amasis MT Pro Black', 'Amasis MT Pro', 'Georgia', serif !important;
+    font-weight: 900 !important;
+    letter-spacing: 0.5px;
+}}
+
+/* Header Principal */
 .header-slide {{
     background: linear-gradient(135deg, #0284C7 0%, #0F172A 100%);
     border-left: 8px solid {GREEN_NEON};
@@ -64,14 +74,23 @@ h1, h2, h3, h4, h5 {{ color: {TEXT_MAIN} !important; font-family: 'Segoe UI', Ro
     font-weight: 800;
 }}
 
-/* Formatação da Foto Arredondada */
-[data-testid="stImage"] img {{
-    border-radius: 50% !important;
-    width: 150px !important;
-    height: 150px !important;
-    object-fit: cover !important;
-    border: 3px solid {GREEN_NEON} !important;
-    box-shadow: 0px 4px 10px rgba(0,0,0,0.3);
+/* Foto de Perfil Arredondada */
+.profile-img {{
+    width: 170px;
+    height: 170px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 4px solid {GREEN_NEON};
+    box-shadow: 0px 8px 20px rgba(0,0,0,0.4);
+}}
+
+/* Cards da Identificação */
+.id-card {{
+    background-color: {CARD_DARK};
+    border: 1px solid {BORDER_DARK};
+    padding: 20px 25px;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
 }}
 
 .stTextInput label, .stSelectbox label, .stNumberInput label, .stDateInput label {{
@@ -84,21 +103,6 @@ h1, h2, h3, h4, h5 {{ color: {TEXT_MAIN} !important; font-family: 'Segoe UI', Ro
     border-radius: 8px;
 }}
 </style>
-""", unsafe_allow_html=True)
-
-# ===== HEADER PRINCIPAL =====
-st.markdown(f"""
-<div class="header-slide">
-    <div style="display:flex; justify-content:space-between; align-items:center;">
-        <div>
-            <h1 style="color:white !important; margin:0; font-size:1.9rem; font-weight:700;">📊 APRESENTAÇÃO — TIME COMERCIAL</h1>
-            <p style="margin:6px 0 0; color:#E2E8F0; font-size:1.0rem;">Painel de Acompanhamento e Desempenho Operacional / Comercial</p>
-        </div>
-        <div style="text-align:right;">
-            <span style="background:{GREEN_NEON}; color:#000; padding:8px 16px; border-radius:20px; font-weight:800; font-size:0.85rem; letter-spacing:0.5px;">SISTEMA KAO</span>
-        </div>
-    </div>
-</div>
 """, unsafe_allow_html=True)
 
 # ===== ESTADO DA SESSÃO (INICIALIZAÇÃO) =====
@@ -136,9 +140,16 @@ if "upcoming" not in st.session_state:
 if "faturado_auto" not in st.session_state:
     st.session_state.faturado_auto = 382000.00
 
-# ===== IMPORTAÇÃO DA PLANILHA (EXPANDER FIXO NO TOPO) =====
-with st.expander("📂 Importar Dados da Planilha (.xlsx)", expanded=False):
-    uploaded_file = st.file_uploader("Arraste ou selecione a planilha Excel", type=["xlsx"])
+# ===== BARRA LATERAL (SIDEBAR): ARQUIVOS E IMPORTS =====
+with st.sidebar:
+    st.header("⚙️ Configurações & Arquivos")
+    
+    st.subheader("1. Foto do Executivo")
+    foto_upload = st.file_uploader("Enviar Foto de Perfil", type=["png", "jpg", "jpeg"])
+
+    st.subheader("2. Dados do Relatório (.xlsx)")
+    uploaded_file = st.file_uploader("Enviar Planilha Excel", type=["xlsx"])
+
     if uploaded_file:
         try:
             excel_data = pd.read_excel(uploaded_file, sheet_name=None)
@@ -180,10 +191,25 @@ with st.expander("📂 Importar Dados da Planilha (.xlsx)", expanded=False):
                         })
 
                     st.session_state.clientes = pd.DataFrame(novos_clientes)
-                    st.success(f"✅ Sucesso! Faturado importado: R$ {fmt_br(total_faturado_calc)}")
+                    st.success(f"✅ Excel importado!")
                     st.rerun()
         except Exception as e:
             st.error(f"Erro ao ler arquivo: {e}")
+
+# ===== HEADER PRINCIPAL =====
+st.markdown(f"""
+<div class="header-slide">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+            <h1 class="executive-font" style="color:white !important; margin:0; font-size:2.0rem;">APRESENTAÇÃO — TIME COMERCIAL</h1>
+            <p style="margin:6px 0 0; color:#E2E8F0; font-size:1.0rem;">Painel de Acompanhamento e Desempenho Operacional / Comercial</p>
+        </div>
+        <div style="text-align:right;">
+            <span style="background:{GREEN_NEON}; color:#000; padding:8px 16px; border-radius:20px; font-weight:800; font-size:0.85rem; letter-spacing:0.5px;">SISTEMA KAO</span>
+        </div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
 # ===== CRIAÇÃO DAS ABAS (SLIDES) =====
 tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
@@ -197,45 +223,57 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
 ])
 
 # ----------------------------------------------------
-# SLIDE 1: IDENTIFICAÇÃO (COM FOTO ARREDONDADA)
+# SLIDE 1: IDENTIFICAÇÃO (DESIGN EXECUTIVO SLIM)
 # ----------------------------------------------------
 with tab1:
     st.subheader("1. Identificação do Executivo")
+    st.write("")
     
-    col_foto, col_campos = st.columns([1, 3])
+    col_foto, col_info = st.columns([1, 3])
     
     with col_foto:
-        foto_upload = st.file_uploader("Sua Foto", type=["png", "jpg", "jpeg"])
-        
         if foto_upload is not None:
-            st.image(foto_upload, width=150)
+            st.image(foto_upload, width=170)
         else:
-            st.markdown("""
+            st.markdown(f"""
             <div style="
-                width: 150px; 
-                height: 150px; 
-                border-radius: 50%; 
-                background-color: #1E293B; 
-                border: 2px dashed #334155; 
-                display: flex; 
-                align-items: center; 
-                justify-content: center; 
-                color: #94A3B8; 
-                font-size: 0.85rem; 
-                text-align: center; 
-                margin-bottom: 10px;">
-                📸 Envie sua foto
+                width: 170px; height: 170px; border-radius: 50%; 
+                background-color: {CARD_DARK}; border: 3px solid {BORDER_DARK}; 
+                display: flex; align-items: center; justify-content: center; 
+                color: {TEXT_MUTED}; font-size: 0.9rem; text-align: center;">
+                👤 Foto na Lateral
             </div>
             """, unsafe_allow_html=True)
 
-    with col_campos:
-        c1, c2 = st.columns([2, 1])
-        with c1:
-            nome = st.text_input("NOME DO EXECUTIVO / KAM", value="Cleyton Kauffmann")
-        with c2:
-            mes = st.selectbox("MÊS DE REFERÊNCIA", months, index=7)
-        
+    with col_info:
+        # Formulário limpo
+        c_nome, c_mes = st.columns([2, 1])
+        with c_nome:
+            nome_input = st.text_input("NOME DO EXECUTIVO / KAM", value="Cleyton Kauffmann")
+        with c_mes:
+            mes_input = st.selectbox("MÊS DE REFERÊNCIA", months, index=7)
+            
         data_ref = st.date_input("DATA DE APRESENTAÇÃO")
+
+        st.divider()
+
+        # Destaque com Fonte Amasis MT Pro Black
+        st.markdown(f"""
+        <div class="id-card">
+            <span style="color: {TEXT_MUTED}; font-size: 0.85rem; font-weight: 700; text-transform: uppercase;">Apresentado por</span>
+            <div class="executive-font" style="font-size: 2.3rem; color: #FFFFFF; margin-top: 4px;">
+                {nome_input.upper()}
+            </div>
+            <div style="display: flex; gap: 15px; margin-top: 10px; align-items: center;">
+                <span class="executive-font" style="background-color: {GREEN_NEON}; color: #000; padding: 4px 12px; border-radius: 6px; font-size: 1.1rem;">
+                    MÊS: {mes_input.upper()}
+                </span>
+                <span style="color: {NAVY_ACCENT}; font-weight: 600; font-size: 1.0rem;">
+                    📅 {data_ref.strftime('%d/%m/%Y')}
+                </span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
 # ----------------------------------------------------
 # SLIDE 2: META & FATURAMENTO
@@ -307,7 +345,7 @@ with tab2:
 with tab3:
     st.subheader("3. META | FATURAMENTO — EVOLUÇÃO HISTÓRICA")
 
-    idx_mes = months.index(mes)
+    idx_mes = months.index(mes_input)
     st.session_state.df_historico.loc[idx_mes, "Fat. Total"] = faturado
 
     # Recalcular métricas
@@ -333,7 +371,7 @@ with tab3:
         }
     )
 
-    # Gráfico Ajustado (Com rótulos na base/parte inferior da barra)
+    # Gráfico Ajustado (Com rótulos na base)
     valores_formatados = [f"R$ {fmt_br(v)}" if v > 0 else "" for v in st.session_state.df_historico["Fat. Total"]]
 
     fig = go.Figure()
@@ -440,7 +478,7 @@ with tab7:
     st.download_button(
         label="📊 Baixar Relatório Consolidado em Excel",
         data=buffer_excel.getvalue(),
-        file_name=f"Relatorio_Comercial_{mes}_{nome.replace(' ', '_')}.xlsx",
+        file_name=f"Relatorio_Comercial_{mes_input}_{nome_input.replace(' ', '_')}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         use_container_width=True
     )
