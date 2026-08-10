@@ -106,7 +106,6 @@ with st.expander("📂 Importar Dados de Planilha Excel (Carga Rápida)", expand
         try:
             excel_data = pd.read_excel(uploaded_file, sheet_name=None)
             
-            # Se a planilha contiver a aba 'Export'
             if "Export" in excel_data:
                 df_export = excel_data["Export"]
                 
@@ -120,7 +119,6 @@ with st.expander("📂 Importar Dados de Planilha Excel (Carga Rápida)", expand
                     df_valid["Mês atual"] = pd.to_numeric(df_valid["Mês atual"], errors='coerce').fillna(0.0)
                     df_valid["Mês anterior"] = pd.to_numeric(df_valid["Mês anterior"], errors='coerce').fillna(0.0)
 
-                    # Top 5 Clientes
                     top5 = df_valid.sort_values(by="Mês atual", ascending=False).head(5)
 
                     novos_clientes = []
@@ -143,7 +141,6 @@ with st.expander("📂 Importar Dados de Planilha Excel (Carga Rápida)", expand
 
                     st.session_state.clientes = pd.DataFrame(novos_clientes)
 
-                    # Faturado Total da Carteira
                     faturado_total = float(df_valid["Mês atual"].sum())
                     st.session_state.faturado_auto = faturado_total
 
@@ -192,27 +189,89 @@ with col_proj:
 pct_realizado = (faturado / meta * 100) if meta > 0 else 0.0
 pct_projecao = (projecao / meta * 100) if meta > 0 else 0.0
 gap_projecao = projecao - meta
+delta_pct = pct_realizado - 100
 
 st.divider()
 
+# ===== INDICADORES EM DESTAQUE (BOLA VERDE/DINÂMICA) =====
 m1, m2, m3 = st.columns(3)
+
+cor_bola = "#1E8449" if pct_realizado >= 100 else "#C0392B"
+cor_badge_delta = "#D4EFDF" if delta_pct >= 0 else "#FADBD8"
+cor_texto_delta = "#1E8449" if delta_pct >= 0 else "#C0392B"
+
 with m1:
-    st.metric(
-        label="% ALCANÇADO (META x FATURADO)",
-        value=f"{pct_realizado:.1f}%".replace(".", ","),
-        delta=f"{(pct_realizado - 100):.1f}% vs Meta".replace(".", ",")
-    )
+    st.markdown(f"""
+    <div style="text-align: center; background: #F8FAFC; padding: 15px; border-radius: 12px; border: 1px solid #E2E8F0;">
+        <span style="font-size: 0.85rem; font-weight: bold; color: #5D6D7E; text-transform: uppercase;">% ALCANÇADO (META x FAT)</span>
+        <div style="
+            width: 110px; 
+            height: 110px; 
+            background: linear-gradient(135deg, {cor_bola} 0%, #145A32 100%); 
+            border-radius: 50%; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            margin: 12px auto; 
+            box-shadow: 0 4px 10px rgba(30, 132, 73, 0.35);
+        ">
+            <span style="color: white; font-size: 1.4rem; font-weight: bold;">{pct_realizado:.1f}%</span>
+        </div>
+        <span style="
+            background-color: {cor_badge_delta}; 
+            color: {cor_texto_delta}; 
+            padding: 4px 12px; 
+            border-radius: 15px; 
+            font-size: 0.85rem; 
+            font-weight: bold;
+        ">
+            {"↑" if delta_pct >= 0 else "↓"} {delta_pct:+.1f}% vs Meta
+        </span>
+    </div>
+    """.replace(".", ","), unsafe_allow_html=True)
+
 with m2:
-    st.metric(
-        label="PROJEÇÃO DA META %",
-        value=f"{pct_projecao:.1f}%".replace(".", ",")
-    )
+    st.markdown(f"""
+    <div style="text-align: center; background: #F8FAFC; padding: 15px; border-radius: 12px; border: 1px solid #E2E8F0;">
+        <span style="font-size: 0.85rem; font-weight: bold; color: #5D6D7E; text-transform: uppercase;">PROJEÇÃO DA META %</span>
+        <div style="
+            width: 110px; 
+            height: 110px; 
+            background: linear-gradient(135deg, #102A43 0%, #163C66 100%); 
+            border-radius: 50%; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            margin: 12px auto; 
+            box-shadow: 0 4px 10px rgba(16, 42, 67, 0.25);
+        ">
+            <span style="color: white; font-size: 1.4rem; font-weight: bold;">{pct_projecao:.1f}%</span>
+        </div>
+        <span style="color: #5D6D7E; font-size: 0.85rem; font-weight: 500;">Projeção de Fechamento</span>
+    </div>
+    """.replace(".", ","), unsafe_allow_html=True)
+
 with m3:
-    st.metric(
-        label="GAP (PROJEÇÃO x META)",
-        value=f"R$ {fmt_br(gap_projecao)}",
-        delta=f"R$ {fmt_br(gap_projecao)}"
-    )
+    cor_gap = "#1E8449" if gap_projecao >= 0 else "#C0392B"
+    st.markdown(f"""
+    <div style="text-align: center; background: #F8FAFC; padding: 15px; border-radius: 12px; border: 1px solid #E2E8F0;">
+        <span style="font-size: 0.85rem; font-weight: bold; color: #5D6D7E; text-transform: uppercase;">GAP (PROJEÇÃO x META)</span>
+        <div style="height: 110px; display: flex; align-items: center; justify-content: center; margin: 12px auto;">
+            <span style="color: {NAVY}; font-size: 1.8rem; font-weight: bold;">R$ {fmt_br(gap_projecao)}</span>
+        </div>
+        <span style="
+            background-color: {cor_badge_delta}; 
+            color: {cor_gap}; 
+            padding: 4px 12px; 
+            border-radius: 15px; 
+            font-size: 0.85rem; 
+            font-weight: bold;
+        ">
+            {"↑" if gap_projecao >= 0 else "↓"} R$ {fmt_br(gap_projecao)}
+        </span>
+    </div>
+    """, unsafe_allow_html=True)
+
 st.markdown('</div>', unsafe_allow_html=True)
 
 # ===== SEÇÃO 3: EVOLUÇÃO HISTÓRICA =====
@@ -275,21 +334,21 @@ st.session_state.df_historico = st.data_editor(
         "UP": st.column_config.NumberColumn("UP (R$)", format="R$ %,.2f", disabled=True),
         "LOSS": st.column_config.NumberColumn("LOSS (R$)", format="R$ %,.2f", disabled=True),
     },
-    key="editor_historico_v6"
+    key="editor_historico_v7"
 )
 
 st.markdown("#### Evolução Mensal (Faturado Alcançado)")
 
-# ===== GRÁFICO (BARRA MAIS FINA + LINHA TRACEJADA) =====
+# ===== GRÁFICO (SOMENTE BARRA FINA VERDE + LINHA TRACEJADA) =====
 fig = go.Figure()
 
-# 1. Barra do FATURADO ALCANÇADO (Verde e com largura reduzida)
+# 1. Barra do FATURADO ALCANÇADO (Fina e Verde)
 fig.add_trace(go.Bar(
     x=st.session_state.df_historico["Mês"],
     y=st.session_state.df_historico["Fat. Total"],
     name="Faturado Alcançado",
     marker_color=GREEN,
-    width=0.35,  # <-- LARGURA REDUZIDA (deixa a barra bem mais fina)
+    width=0.35,  # Barra Fina
     hovertemplate="Mês: %{x}<br>Alcançado: R$ %{y:,.2f}<extra></extra>"
 ))
 
