@@ -6,6 +6,13 @@ import pptx
 from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
 
+# ===== Função de Formatação Brasileira (ex: 350.658,00) =====
+def fmt_br(valor):
+    try:
+        return f"{float(valor):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    except (ValueError, TypeError):
+        return "0,00"
+
 # ===== Configuração da Página =====
 st.set_page_config(page_title="Apresentação Comercial - KAO", page_icon="🚚", layout="wide")
 
@@ -13,7 +20,6 @@ st.set_page_config(page_title="Apresentação Comercial - KAO", page_icon="🚚"
 NAVY = "#102A43"
 GREEN = "#1E8449"
 BLUE = "#1F5A94"
-LIGHT_BG = "#F4F7F6"
 GRAY = "#5D6D7E"
 
 st.markdown(f"""
@@ -22,7 +28,6 @@ st.markdown(f"""
 .block-container {{ padding-top: 1.5rem; max-width: 1350px; }}
 h1, h2, h3 {{ color: {NAVY}; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }}
 
-/* Cabeçalho estilo Slide */
 .header-slide {{
     background: linear-gradient(135deg, {NAVY} 0%, #163C66 100%);
     border-left: 8px solid {GREEN};
@@ -33,7 +38,6 @@ h1, h2, h3 {{ color: {NAVY}; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, s
     box-shadow: 0 4px 6px rgba(0,0,0,0.05);
 }}
 
-/* Cards de Seção */
 .section-card {{
     background: white;
     padding: 20px;
@@ -41,15 +45,6 @@ h1, h2, h3 {{ color: {NAVY}; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, s
     border: 1px solid #E2E8F0;
     margin-bottom: 20px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-}}
-
-/* Destaque para Valores e Kpis */
-.kpi-box {{
-    background: #F1F5F9;
-    border-radius: 8px;
-    padding: 12px;
-    text-align: center;
-    border: 1px solid #E2E8F0;
 }}
 </style>
 """, unsafe_allow_html=True)
@@ -95,7 +90,9 @@ with st.expander("📂 Importar Dados de Planilha Excel (Carga Rápida)", expand
         try:
             excel_data = pd.read_excel(uploaded_file, sheet_name=None)
             st.success("Planilha carregada com sucesso!")
-            if "Historico" in excel_data:
+            if "Export" in excel_data:
+                st.session_state["df_export_imported"] = excel_data["Export"]
+            elif "Historico" in excel_data:
                 st.session_state["df_hist_imported"] = excel_data["Historico"]
         except Exception as e:
             st.error(f"Erro ao ler arquivo: {e}")
@@ -123,13 +120,13 @@ st.caption("A Meta é definida previamente pela Gerência. Insira o Faturado Alc
 col_meta, col_fat, col_proj = st.columns(3)
 
 with col_meta:
-    meta = st.number_input("📌 META DA GERÊNCIA (R$)", min_value=0.0, value=100000.0, step=5000.0)
+    meta = st.number_input("📌 META DA GERÊNCIA (R$)", min_value=0.0, value=350658.00, step=1000.0)
 
 with col_fat:
-    faturado = st.number_input("💰 FATURADO ALCANÇADO (R$)", min_value=0.0, value=0.0, step=5000.0)
+    faturado = st.number_input("💰 FATURADO ALCANÇADO (R$)", min_value=0.0, value=0.0, step=1000.0)
 
 with col_proj:
-    projecao = st.number_input("📈 PROJEÇÃO MÊS (R$)", min_value=0.0, value=faturado, step=5000.0)
+    projecao = st.number_input("📈 PROJEÇÃO MÊS (R$)", min_value=0.0, value=faturado, step=1000.0)
 
 # CÁLCULOS
 pct_realizado = (faturado / meta * 100) if meta > 0 else 0.0
@@ -142,20 +139,19 @@ m1, m2, m3 = st.columns(3)
 with m1:
     st.metric(
         label="% ALCANÇADO (META x FATURADO)",
-        value=f"{pct_realizado:.1f}%",
-        delta=f"{pct_realizado - 100:.1f}% vs Meta",
-        delta_color="normal"
+        value=f"{pct_realizado:.1f}%".replace(".", ","),
+        delta=f"{(pct_realizado - 100):.1f}% vs Meta".replace(".", ",")
     )
 with m2:
     st.metric(
         label="PROJEÇÃO DA META %",
-        value=f"{pct_projecao:.1f}%"
+        value=f"{pct_projecao:.1f}%".replace(".", ",")
     )
 with m3:
     st.metric(
         label="GAP (PROJEÇÃO x META)",
-        value=f"R$ {gap_projecao:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
-        delta=f"R$ {gap_projecao:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        value=f"R$ {fmt_br(gap_projecao)}",
+        delta=f"R$ {fmt_br(gap_projecao)}"
     )
 st.markdown('</div>', unsafe_allow_html=True)
 
@@ -170,7 +166,7 @@ if "df_hist_imported" in st.session_state:
 else:
     hist_base = pd.DataFrame({
         "Mês": months,
-        "Meta Total": [100000.0] * 12,
+        "Meta Total": [350658.00] * 12,
         "Fat. Total": [0.0] * 12,
         "% Total": [0.0] * 12,
         "UP": [0.0] * 12,
@@ -183,11 +179,11 @@ edited_hist = st.data_editor(
     hide_index=True,
     column_config={
         "Mês": st.column_config.TextColumn(disabled=True),
-        "Meta Total": st.column_config.NumberColumn("Meta Total (R$)", format="R$ %.2f"),
-        "Fat. Total": st.column_config.NumberColumn("Fat. Total (R$)", format="R$ %.2f"),
+        "Meta Total": st.column_config.NumberColumn("Meta Total (R$)", format="R$ %,.2f"),
+        "Fat. Total": st.column_config.NumberColumn("Fat. Total (R$)", format="R$ %,.2f"),
         "% Total": st.column_config.NumberColumn("% Atingido", format="%.1f%%", disabled=True),
-        "UP": st.column_config.NumberColumn("UP (R$)", format="R$ %.2f", disabled=True),
-        "LOSS": st.column_config.NumberColumn("LOSS (R$)", format="R$ %.2f", disabled=True),
+        "UP": st.column_config.NumberColumn("UP (R$)", format="R$ %,.2f", disabled=True),
+        "LOSS": st.column_config.NumberColumn("LOSS (R$)", format="R$ %,.2f", disabled=True),
     },
     key="editor_historico"
 )
@@ -213,9 +209,9 @@ st.session_state.clientes = st.data_editor(
     hide_index=True,
     key="editor_clientes",
     column_config={
-        "RECEITA": st.column_config.NumberColumn("RECEITA (R$)", format="R$ %.2f"),
-        "MÊS ANTERIOR": st.column_config.NumberColumn("MÊS ANTERIOR (R$)", format="R$ %.2f"),
-        "ANO ANTERIOR": st.column_config.NumberColumn("ANO ANTERIOR (R$)", format="R$ %.2f"),
+        "RECEITA": st.column_config.NumberColumn("RECEITA (R$)", format="R$ %,.2f"),
+        "MÊS ANTERIOR": st.column_config.NumberColumn("MÊS ANTERIOR (R$)", format="R$ %,.2f"),
+        "ANO ANTERIOR": st.column_config.NumberColumn("ANO ANTERIOR (R$)", format="R$ %,.2f"),
         "RENTABILIDADE": st.column_config.NumberColumn("RENTABILIDADE %", format="%.1f%%"),
         "SLA": st.column_config.NumberColumn("SLA %", format="%.1f%%"),
         "CONSIDERAÇÕES": st.column_config.TextColumn("CONSIDERAÇÕES / OBS")
@@ -227,9 +223,9 @@ tot_top5 = df_valid_cli["RECEITA"].sum()
 
 c_tot1, c_tot2 = st.columns(2)
 with c_tot1:
-    st.metric("TOTAL TOP 5 CLIENTES", f"R$ {tot_top5:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+    st.metric("TOTAL TOP 5 CLIENTES", f"R$ {fmt_br(tot_top5)}")
 with c_tot2:
-    st.metric("TOTAL CARTEIRA GERAL", f"R$ {tot_top5:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+    st.metric("TOTAL CARTEIRA GERAL", f"R$ {fmt_br(tot_top5)}")
 st.markdown('</div>', unsafe_allow_html=True)
 
 # ===== SEÇÃO 5: PIPELINE & UPCOMING =====
@@ -243,8 +239,8 @@ st.session_state.fechados = st.data_editor(
     hide_index=True,
     key="editor_fechados",
     column_config={
-        "PROJEÇÃO MÊS": st.column_config.NumberColumn(format="R$ %.2f"),
-        "FATURADO MÊS": st.column_config.NumberColumn(format="R$ %.2f"),
+        "PROJEÇÃO MÊS": st.column_config.NumberColumn(format="R$ %,.2f"),
+        "FATURADO MÊS": st.column_config.NumberColumn(format="R$ %,.2f"),
     }
 )
 
@@ -256,7 +252,7 @@ st.session_state.upcoming = st.data_editor(
     hide_index=True,
     key="editor_upcoming",
     column_config={
-        "PROJEÇÃO MÊS": st.column_config.NumberColumn(format="R$ %.2f"),
+        "PROJEÇÃO MÊS": st.column_config.NumberColumn(format="R$ %,.2f"),
     }
 )
 st.markdown('</div>', unsafe_allow_html=True)
@@ -274,10 +270,15 @@ with col_exp1:
         with pd.ExcelWriter(output_xl, engine="openpyxl") as writer:
             pd.DataFrame([{
                 "Nome": nome, "Mês": mes, "Data": data_ref,
-                "Meta Gerência": meta, "Faturado Alcançado": faturado,
-                "% Alcançado": pct_realizado, "Projeção": projecao
+                "Meta Gerência": fmt_br(meta), "Faturado Alcançado": fmt_br(faturado),
+                "% Alcançado": f"{pct_realizado:.1f}%".replace(".", ","), "Projeção": fmt_br(projecao)
             }]).to_excel(writer, sheet_name="Resumo_Executivo", index=False)
-            calc_hist.to_excel(writer, sheet_name="Historico", index=False)
+            
+            calc_hist_fmt = calc_hist.copy()
+            for col in ["Meta Total", "Fat. Total", "UP", "LOSS"]:
+                calc_hist_fmt[col] = calc_hist_fmt[col].apply(fmt_br)
+            calc_hist_fmt.to_excel(writer, sheet_name="Historico", index=False)
+            
             st.session_state.clientes.to_excel(writer, sheet_name="Principais_Clientes", index=False)
             st.session_state.fechados.to_excel(writer, sheet_name="Novos_Negocios", index=False)
             st.session_state.upcoming.to_excel(writer, sheet_name="Upcoming", index=False)
@@ -296,15 +297,14 @@ with col_exp2:
         prs = Presentation()
         blank_slide_layout = prs.slide_layouts[6]
         
-        # Slide 1: Capa / Resumo Meta
         slide1 = prs.slides.add_slide(blank_slide_layout)
         txBox = slide1.shapes.add_textbox(Inches(1), Inches(1), Inches(8), Inches(1))
         tf = txBox.text_frame
         tf.text = f"APRESENTAÇÃO TIME COMERCIAL - {mes.upper()}"
         
         p2 = tf.add_paragraph()
-        p2.text = f"Executivo: {nome} | Meta Alcançada: {pct_realizado:.1f}%"
-        p2.font.size = Pt(20)
+        p2.text = f"Executivo: {nome} | Faturado: R$ {fmt_br(faturado)} / Meta: R$ {fmt_br(meta)} ({pct_realizado:.1f}%)".replace(".", ",")
+        p2.font.size = Pt(18)
         p2.font.color.rgb = RGBColor(30, 132, 73)
         
         output_ppt = BytesIO()
